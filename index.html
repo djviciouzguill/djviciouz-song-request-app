@@ -16,8 +16,10 @@
     .status{font-size:13px;opacity:.85;margin-top:4px}
     .bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
     .pill{padding:8px 10px;border-radius:999px;background:#101010;border:1px solid #2a2a2a}
-    .search{flex:1;min-width:240px}
+    .search{flex:1;min-width:220px}
     .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
+    .select{min-width:180px}
+    .select select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
     .btn{background:var(--btn);border:1px solid var(--btnb);color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer}
     .btn:hover{border-color:#555}
     .loading{display:inline-flex;gap:8px;align-items:center;border:1px solid #2a2a2a;background:var(--panel);padding:10px 12px;border-radius:10px;margin-top:10px}
@@ -29,6 +31,7 @@
     td.muted{color:var(--muted)}
     tbody tr:hover{background:#0d0d0d}
     .btn-sm{padding:6px 10px;border-radius:8px}
+    .hint{font-size:12px;opacity:.7;margin-top:6px}
   </style>
 </head>
 <body>
@@ -37,19 +40,27 @@
       <img src="djviciouzbranding.png" alt="DJ Viciouz" />
       <div>
         <h1>DJ Viciouz — Song Request Library</h1>
-        <div class="status" id="status">Loading library…</div>
+        <div class="status" id="status">Loading Song List…</div>
+        <div class="hint" id="netHint" style="display:none">Network is slow—first batch will appear as it arrives.</div>
       </div>
     </header>
 
     <div class="bar">
-      <div class="search"><input id="search" type="text" placeholder="Search artist, title, or genre…" disabled></div>
+      <div class="search">
+        <input id="search" type="text" placeholder="Search artist, title, or genre…" disabled>
+      </div>
+      <div class="select">
+        <select id="genreSelect" disabled>
+          <option value="">All genres</option>
+        </select>
+      </div>
       <button class="btn" id="btnFirst">Show first 10</button>
       <button class="btn" id="btnRandom">Random 25</button>
       <button class="btn" id="btnMore">Show more</button>
       <span class="pill" id="count">0 / 0 shown</span>
     </div>
 
-    <div class="loading" id="loader"><span class="dot"></span> <span>Loading Songs…</span></div>
+    <div class="loading" id="loader"><span class="dot"></span> <span>Loading Song List…</span></div>
 
     <table>
       <thead>
@@ -67,43 +78,77 @@
   </div>
 
   <script>
-    // ===== CSV SOURCE (same-origin on GitHub Pages) =====
-    const CSV_URL = 'djviciouz_serato_library_v2.csv';
-    // Or use raw.githubusercontent if you prefer:
-    // const CSV_URL = 'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciouz_serato_library_v2.csv';
-
-    // ===== EXPECTED HEADERS =====
-    // artist,title,bpm,genre,year
+    // ====== CONFIG (edit just your phone number) ======
+    const REQUEST_SMS_NUMBER = '15551234567'; // digits only
+    const REQUEST_SMS = `sms:+${REQUEST_SMS_NUMBER}`;
 
     // Performance knobs
     const PAGE = 10;          // quick first paint
-    const MAX_RENDER = 200;   // cap DOM rows for smoothness
-    const MORE_STEP = 100;    // rows appended per "Show more"
+    const MAX_RENDER = 200;   // cap DOM rows
+    const MORE_STEP = 100;
 
+    // Persisted UI state
+    const LS_GENRE = 'djv_genre';
+    const LS_QUERY = 'djv_query';
+
+    // ====== Robust CSV URL resolver ======
+    // We try several absolute URLs (worker-safe) until one returns 200.
+    const ORIGIN = 'https://djviciouzguill.github.io';
+    const BASE   = '/djviciouz-song-request-app/';
+
+    const CANDIDATE_URLS = [
+      // common spellings — repo root
+      ORIGIN + BASE + 'djviciouz_serato_library_v2.csv',
+      ORIGIN + BASE + 'djviciou_serato_library_v2.csv',
+      // common spellings — /data folder
+      ORIGIN + BASE + 'data/djviciouz_serato_library_v2.csv',
+      ORIGIN + BASE + 'data/djviciou_serato_library_v2.csv',
+      // raw github fallbacks
+      'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciouz_serato_library_v2.csv',
+      'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciou_serato_library_v2.csv'
+    ];
+
+    async function resolveCsvUrl() {
+      for (const url of CANDIDATE_URLS) {
+        try {
+          const res = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
+          if (res.ok) {
+            console.log('[CSV] using', url);
+            return url;
+          } else {
+            console.warn('[CSV] not ok:', url, res.status);
+          }
+        } catch (e) {
+          console.warn('[CSV] failed:', url, e?.message);
+        }
+      }
+      throw new Error('No working CSV URL found. Check filename/location in the repo.');
+    }
+
+    // ====== App state ======
     const allRows = [];
-    let viewRows = [];
+    let filteredRows = [];
     let shown = 0;
 
     const $ = s => document.querySelector(s);
     const tbody = $('#tbody');
+    const genreSelect = $('#genreSelect');
+    const searchInput = $('#search');
 
-    // ===== Request settings (replace with your number) =====
-    const REQUEST_SMS_NUMBER = '15551234567'; // digits only
-    const REQUEST_SMS = `sms:+${REQUEST_SMS_NUMBER}`;
-
-    function esc(s){return String(s ?? '').replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-    function clean(v){return (v ?? '').toString().trim()}
+    const esc   = s => String(s ?? '').replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    const clean = v => (v ?? '').toString().trim();
 
     function requestSong(row){
       const body = encodeURIComponent(`Song request: ${row.artist} - ${row.title}`);
-      const url = `${REQUEST_SMS}&body=${body}`;
-      window.open(url, '_blank');
+      window.open(`${REQUEST_SMS}&body=${body}`, '_blank');
     }
 
     function render(slice, append=false){
       const frag = document.createDocumentFragment();
-      const limited = slice.slice(0, MAX_RENDER - (append ? tbody.rows.length : 0));
-      for (const r of limited){
+      const limit = Math.max(0, MAX_RENDER - (append ? tbody.rows.length : 0));
+      const capped = slice.slice(0, limit);
+
+      for (const r of capped){
         const tr = document.createElement('tr');
         tr.innerHTML =
           `<td>${esc(r.artist)}</td>
@@ -116,88 +161,150 @@
       }
       if(!append) tbody.innerHTML = '';
       tbody.appendChild(frag);
-      $('#count').textContent = `${tbody.rows.length} / ${(viewRows.length || allRows.length)} shown`;
-      $('#btnMore').disabled = shown >= viewRows.length || tbody.rows.length >= MAX_RENDER;
+      $('#count').textContent = `${tbody.rows.length} / ${filteredRows.length || allRows.length} shown`;
+      $('#btnMore').disabled = shown >= filteredRows.length || tbody.rows.length >= MAX_RENDER;
+    }
+
+    function currentQuery(){ return (searchInput.value || '').toLowerCase(); }
+    function currentGenre(){ return genreSelect.value || ''; }
+
+    function applyFilters(){
+      const q = currentQuery();
+      const g = currentGenre();
+      filteredRows = allRows.filter(r => {
+        const matchesText  = !q || (r.artist + ' ' + r.title + ' ' + r.genre).toLowerCase().includes(q);
+        const matchesGenre = !g || (r.genre.toLowerCase() === g.toLowerCase());
+        return matchesText && matchesGenre;
+      });
+      shown = 0;
+      const slice = filteredRows.slice(0, PAGE);
+      shown += slice.length;
+      render(slice, false);
+      try {
+        localStorage.setItem(LS_QUERY, searchInput.value || '');
+        localStorage.setItem(LS_GENRE, genreSelect.value || '');
+      } catch {}
     }
 
     function showFirst(){
-      viewRows = allRows.slice();
       shown = 0;
-      const slice = viewRows.slice(0, PAGE);
+      const slice = filteredRows.slice(0, PAGE);
       shown += slice.length;
       render(slice, false);
     }
 
     function showRandom(){
-      const n = Math.min(25, allRows.length);
-      const idxs = Array.from({length: allRows.length}, (_, i) => i);
-      for(let i=idxs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idxs[i],idxs[j]]=[idxs[j],idxs[i]];}
-      viewRows = idxs.slice(0,n).map(i => allRows[i]);
+      const n = Math.min(25, filteredRows.length);
+      const idxs = Array.from({length: filteredRows.length}, (_, i) => i);
+      for(let i=idxs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [idxs[i],idxs[j]]=[idxs[j],idxs[i]]; }
+      const rows = idxs.slice(0, n).map(i => filteredRows[i]);
       shown = n;
-      render(viewRows, false);
+      render(rows, false);
     }
 
     function showMore(){
-      if(!viewRows.length) return;
-      const slice = viewRows.slice(shown, shown+MORE_STEP);
+      const slice = filteredRows.slice(shown, shown+MORE_STEP);
       shown += slice.length;
       if(slice.length) render(slice, true);
     }
 
-    function applySearch(q){
-      q = (q || '').toLowerCase();
-      viewRows = !q ? allRows.slice() :
-        allRows.filter(r => (r.artist + ' ' + r.title + ' ' + r.genre).toLowerCase().includes(q));
-      shown = 0;
-      const slice = viewRows.slice(0, PAGE);
-      shown += slice.length;
-      render(slice, false);
+    function populateGenres(){
+      const set = new Set();
+      for (const r of allRows){
+        const g = r.genre && r.genre.trim();
+        if (g) set.add(g);
+      }
+      const genres = Array.from(set).sort((a,b)=>a.localeCompare(b));
+      for (const g of genres){
+        const opt = document.createElement('option');
+        opt.value = g;
+        opt.textContent = g;
+        genreSelect.appendChild(opt);
+      }
+      genreSelect.disabled = false;
+
+      // restore last chosen genre if present
+      try {
+        const savedGenre = localStorage.getItem(LS_GENRE) || '';
+        if (savedGenre && genres.includes(savedGenre)) {
+          genreSelect.value = savedGenre;
+        }
+      } catch {}
+    }
+
+    function restoreQuery(){
+      try {
+        const saved = localStorage.getItem(LS_QUERY) || '';
+        if (saved) searchInput.value = saved;
+      } catch {}
     }
 
     function enableUI(total){
       $('#loader').style.display = 'none';
       $('#status').textContent = `${total} tracks loaded`;
-      $('#search').disabled = false;
-      showFirst();
+      $('#netHint').style.display = 'none';
+      populateGenres();
+      restoreQuery();
+      filteredRows = allRows.slice();
+      searchInput.disabled = false;
+      applyFilters();
     }
 
-    // ===== Load & parse CSV off the main thread =====
-    Papa.parse(CSV_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      worker: true,          // parse in a Web Worker
-      chunkSize: 1024 * 64,  // ~64KB chunks
-      chunk: (results) => {
-        for (const r of results.data) {
-          const row = {
-            artist: clean(r.artist),
-            title:  clean(r.title),
-            bpm:    clean(r.bpm),
-            genre:  clean(r.genre),
-            year:   clean(r.year)
-          };
-          if (row.artist || row.title) allRows.push(row);
-        }
-        // First paint as soon as we have enough
-        if (allRows.length >= PAGE && $('#search').disabled) {
-          enableUI(allRows.length);
-        }
-      },
-      complete: () => {
-        if (!allRows.length) {
-          $('#loader').style.display = 'none';
-          $('#status').textContent = 'No rows found. Check headers: artist,title,bpm,genre,year';
-          return;
-        }
-        if ($('#search').disabled) enableUI(allRows.length);
-      },
-      error: (err) => {
-        $('#loader').style.display = 'none';
-        $('#status').textContent = 'Failed to load CSV (check path/filename).';
-        console.error(err);
+    // Warn if network is slow to first chunk
+    setTimeout(() => {
+      if (document.getElementById('loader').style.display !== 'none') {
+        $('#netHint').style.display = 'block';
       }
-    });
+    }, 2500);
+
+    // ====== Boot: resolve URL, then parse with worker ======
+    (async function boot(){
+      let CSV_URL = null;
+      try {
+        CSV_URL = await resolveCsvUrl();
+      } catch (e) {
+        $('#loader').style.display = 'none';
+        $('#status').textContent = 'Could not locate the library CSV. Check filename/location in the repo.';
+        console.error(e);
+        return;
+      }
+
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        worker: true,          // parse in a Web Worker (prevents UI freeze)
+        chunkSize: 1024 * 64,  // ~64KB chunks
+        chunk: (results) => {
+          for (const r of results.data) {
+            const row = {
+              artist: clean(r.artist),
+              title:  clean(r.title),
+              bpm:    clean(r.bpm),
+              genre:  clean(r.genre),
+              year:   clean(r.year)
+            };
+            if (row.artist || row.title) allRows.push(row);
+          }
+          if (allRows.length >= PAGE && document.getElementById('search').disabled) {
+            enableUI(allRows.length);
+          }
+        },
+        complete: () => {
+          if (!allRows.length) {
+            $('#loader').style.display = 'none';
+            $('#status').textContent = 'No rows found. Check headers: artist,title,bpm,genre,year';
+            return;
+          }
+          if (document.getElementById('search').disabled) enableUI(allRows.length);
+        },
+        error: (err) => {
+          $('#loader').style.display = 'none';
+          $('#status').textContent = 'Failed to load CSV.';
+          console.error(err);
+        }
+      });
+    })();
 
     // ===== Events =====
     $('#btnFirst').addEventListener('click', showFirst);
@@ -205,11 +312,12 @@
     $('#btnMore').addEventListener('click', showMore);
 
     let t=null;
-    $('#search').addEventListener('input', (e)=>{
+    $('#search').addEventListener('input', ()=>{
       clearTimeout(t);
-      const q = e.target.value;
-      t = setTimeout(()=> applySearch(q), 120);
+      t = setTimeout(()=> applyFilters(), 120);
     });
+
+    $('#genreSelect').addEventListener('change', applyFilters);
   </script>
 </body>
 </html>
