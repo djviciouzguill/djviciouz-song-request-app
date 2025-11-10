@@ -1,87 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DJ Viciouz Song Request App</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DJ Viciouz — Song Request</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: radial-gradient(circle at center, #111, #000);
-      color: #fff;
-      text-align: center;
-      padding: 30px;
-    }
-    img.logo {
-      width: 220px;
-      margin-bottom: 20px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      border: 1px solid #333;
-      padding: 8px;
-    }
-    th {
-      background: #222;
-      position: sticky;
-      top: 0;
-    }
-    input {
-      padding: 8px;
-      width: 60%;
-      margin-bottom: 20px;
-    }
+    :root{--bg1:#000;--bg2:#111;--fg:#fff;--muted:#b3b3b3;--line:#222;--panel:#0a0a0a;--btn:#1e1e1e;--btnb:#333;--accent:#00d0ff}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at center,var(--bg2),var(--bg1));color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .container{max-width:1100px;margin:0 auto;padding:22px}
+    header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    header img{height:56px;width:auto;border-radius:8px}
+    h1{font-size:22px;margin:0}
+    .status{font-size:13px;opacity:.85;margin-top:4px}
+    .bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .pill{padding:8px 10px;border-radius:999px;background:#101010;border:1px solid #2a2a2a}
+    .search{flex:1;min-width:240px}
+    .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
+    .btn{background:var(--btn);border:1px solid var(--btnb);color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .btn:hover{border-color:#555}
+    .loading{display:inline-flex;gap:8px;align-items:center;border:1px solid #2a2a2a;background:var(--panel);padding:10px 12px;border-radius:10px;margin-top:10px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 1s infinite alternate}
+    @keyframes pulse{from{transform:scale(.8);opacity:.6}to{transform:scale(1.2);opacity:1}}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
+    th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid #333;z-index:1}
+    td.muted{color:var(--muted)}
+    tbody tr:hover{background:#0d0d0d}
   </style>
 </head>
 <body>
-  <img src="djviciouzbranding.png" alt="DJ Viciouz Logo" class="logo" />
-  <h1>DJ Viciouz Song Request Library</h1>
-  <input type="text" id="search" placeholder="Search by artist, title, or genre..." />
-  <table id="library">
-    <thead>
-      <tr>
-        <th>Artist</th>
-        <th>Title</th>
-        <th>BPM</th>
-        <th>Genre</th>
-        <th>Year</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="container">
+    <header>
+      <img src="djviciouzbranding.png" alt="DJ Viciouz" />
+      <div>
+        <h1>DJ Viciouz — Song Request Library</h1>
+        <div class="status" id="status">Loading library…</div>
+      </div>
+    </header>
+
+    <div class="bar">
+      <div class="search"><input id="search" type="text" placeholder="Search artist, title, or genre…" disabled></div>
+      <button class="btn" id="btnFirst">Show first 25</button>
+      <button class="btn" id="btnRandom">Random 25</button>
+      <button class="btn" id="btnMore">Show more</button>
+      <span class="pill" id="count">0 / 0 shown</span>
+    </div>
+
+    <div class="loading" id="loader"><span class="dot"></span> <span>Fetching CSV…</span></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:28%">Artist</th>
+          <th style="width:40%">Title</th>
+          <th style="width:8%">BPM</th>
+          <th style="width:16%">genre</th>
+          <th style="width:8%">Year</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
 
   <script>
-    const DEFAULT_SHEET_URL =
-	  'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/refs/heads/main/djviciouz_serato_library_v2.csv';
+    // ===== CSV SOURCE =====
+    // Best option (same origin on GitHub Pages):
+    const CSV_URL = 'djviciouz_serato_library_v2.csv';
+    // If you prefer raw.githubusercontent, use this exact URL instead:
+    // const CSV_URL = 'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciouz_serato_library_v2.csv';
 
-    async function loadLibrary(url) {
-      const response = await fetch(url);
-      const text = await response.text();
-      const rows = text.split('\n').map(r => r.split(','));
-      const tbody = document.querySelector('#library tbody');
-      tbody.innerHTML = '';
-      for (let i = 1; i < rows.length; i++) {
-        const [artist, title, bpm, genre, year] = rows[i];
-        if (!artist && !title) continue;
-        const row = `<tr><td>${artist||''}</td><td>${title||''}</td><td>${bpm||''}</td><td>${genre||''}</td><td>${year||''}</td></tr>`;
-        tbody.innerHTML += row;
-      }
+    // ===== EXPECTED HEADERS =====
+    // artist,title,bpm,genre,year  (case-sensitive on our side)
+
+    const PAGE = 25;
+    const allRows = [];
+    let viewRows = [];
+    let shown = 0;
+
+    const $ = s => document.querySelector(s);
+    const tbody = $('#tbody');
+
+    function esc(s){return String(s ?? '').replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+    function clean(v){return (v ?? '').toString().trim()}
+
+    function render(slice, append=false){
+      const frag = document.createDocumentFragment();
+      slice.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          `<td>${esc(r.artist)}</td>
+           <td>${esc(r.title)}</td>
+           <td class="muted">${esc(r.bpm)}</td>
+           <td class="muted">${esc(r.genre)}</td>
+           <td class="muted">${esc(r.year)}</td>`;
+        frag.appendChild(tr);
+      });
+      if(!append) tbody.innerHTML = '';
+      tbody.appendChild(frag);
+      $('#count').textContent = `${tbody.rows.length} / ${(viewRows.length || allRows.length)} shown`;
+      $('#btnMore').disabled = shown >= viewRows.length;
     }
 
-    document.getElementById('search').addEventListener('input', e => {
-      const filter = e.target.value.toLowerCase();
-      document.querySelectorAll('#library tbody tr').forEach(tr => {
-        const text = tr.textContent.toLowerCase();
-        tr.style.display = text.includes(filter) ? '' : 'none';
-      });
+    function showFirst(){
+      viewRows = allRows.slice();
+      shown = 0;
+      const slice = viewRows.slice(0, PAGE);
+      shown += slice.length;
+      render(slice, false);
+    }
+
+    function showRandom(){
+      const n = Math.min(PAGE, allRows.length);
+      const idxs = Array.from({length: allRows.length}, (_, i) => i);
+      for(let i=idxs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idxs[i],idxs[j]]=[idxs[j],idxs[i]];}
+      viewRows = idxs.slice(0,n).map(i => allRows[i]);
+      shown = n;
+      render(viewRows, false);
+    }
+
+    function showMore(){
+      if(!viewRows.length) return;
+      const slice = viewRows.slice(shown, shown+PAGE);
+      shown += slice.length;
+      if(slice.length) render(slice, true);
+    }
+
+    function applySearch(q){
+      q = (q || '').toLowerCase();
+      viewRows = !q ? allRows.slice() :
+        allRows.filter(r => (r.artist + ' ' + r.title + ' ' + r.genre).toLowerCase().includes(q));
+      shown = 0;
+      const slice = viewRows.slice(0, PAGE);
+      shown += slice.length;
+      render(slice, false);
+    }
+
+    function enableUI(total){
+      $('#loader').style.display = 'none';
+      $('#status').textContent = `${total} tracks loaded`;
+      $('#search').disabled = false;
+      showFirst();
+    }
+
+    // ===== Load CSV =====
+    Papa.parse(CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      step: (res) => {
+        const r = res.data;
+        // normalize expected columns
+        const row = {
+          artist: clean(r.artist),
+          title:  clean(r.title),
+          bpm:    clean(r.bpm),
+          genre:  clean(r.genre),
+          year:   clean(r.year)
+        };
+        if(!(row.artist || row.title)) return;
+        allRows.push(row);
+        if(allRows.length === PAGE){ enableUI(allRows.length); }
+      },
+      complete: () => {
+        if(!allRows.length){
+          $('#status').textContent = 'No rows found. Check headers: artist,title,bpm,genre,year';
+          $('#loader').style.display = 'none';
+          return;
+        }
+        if($('#search').disabled) enableUI(allRows.length);
+      },
+      error: (err) => {
+        $('#loader').style.display = 'none';
+        $('#status').textContent = 'Failed to load CSV (check path/permissions).';
+        console.error(err);
+      }
     });
 
-    loadLibrary(DEFAULT_SHEET_URL);
+    // ===== Events =====
+    $('#btnFirst').addEventListener('click', showFirst);
+    $('#btnRandom').addEventListener('click', showRandom);
+    $('#btnMore').addEventListener('click', showMore);
+
+    let t=null;
+    $('#search').addEventListener('input', (e)=>{
+      clearTimeout(t);
+      const q = e.target.value;
+      t = setTimeout(()=> applySearch(q), 120);
+    });
   </script>
 </body>
 </html>
-
