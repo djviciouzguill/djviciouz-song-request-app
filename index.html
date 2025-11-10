@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DJ Viciouz Song Request App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle at center, #111, #000);
+      color: #fff;
+      text-align: center;
+      padding: 30px;
+    }
+    img.logo {
+      width: 220px;
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 8px;
+    }
+    th {
+      background: #222;
+      position: sticky;
+      top: 0;
+    }
+    input {
+      padding: 8px;
+      width: 60%;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <img src="djviciouzbranding.png" alt="DJ Viciouz Logo" class="logo" />
+  <h1>DJ Viciouz Song Request Library</h1>
+  <input type="text" id="search" placeholder="Search by artist, title, or genre..." />
+  <table id="library">
+    <thead>
+      <tr>
+        <th>Artist</th>
+        <th>Title</th>
+        <th>BPM</th>
+        <th>Genre</th>
+        <th>Year</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const DEFAULT_SHEET_URL =
+      'https://docs.google.com/spreadsheets/d/1o0nzCawFe4AdGEdPXGD85ZX5KWYkjFOKk4V4-otkq0s/gviz/tq?tqx=out:csv';
+
+    async function loadLibrary(url) {
+      const response = await fetch(url);
+      const text = await response.text();
+      const rows = text.split('\n').map(r => r.split(','));
+      const tbody = document.querySelector('#library tbody');
+      tbody.innerHTML = '';
+      for (let i = 1; i < rows.length; i++) {
+        const [artist, title, bpm, genre, year] = rows[i];
+        if (!artist && !title) continue;
+        const row = `<tr><td>${artist||''}</td><td>${title||''}</td><td>${bpm||''}</td><td>${genre||''}</td><td>${year||''}</td></tr>`;
+        tbody.innerHTML += row;
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', e => {
+      const filter = e.target.value.toLowerCase();
+      document.querySelectorAll('#library tbody tr').forEach(tr => {
+        const text = tr.textContent.toLowerCase();
+        tr.style.display = text.includes(filter) ? '' : 'none';
+      });
+    });
+
+    loadLibrary(DEFAULT_SHEET_URL);
+  </script>
+</body>
+</html>
