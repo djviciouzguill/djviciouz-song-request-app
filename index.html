@@ -28,6 +28,7 @@
     th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid #333;z-index:1}
     td.muted{color:var(--muted)}
     tbody tr:hover{background:#0d0d0d}
+    .btn-sm{padding:6px 10px;border-radius:8px}
   </style>
 </head>
 <body>
@@ -42,7 +43,7 @@
 
     <div class="bar">
       <div class="search"><input id="search" type="text" placeholder="Search artist, title, or genre…" disabled></div>
-      <button class="btn" id="btnFirst">Show first 25</button>
+      <button class="btn" id="btnFirst">Show first 10</button>
       <button class="btn" id="btnRandom">Random 25</button>
       <button class="btn" id="btnMore">Show more</button>
       <span class="pill" id="count">0 / 0 shown</span>
@@ -53,11 +54,12 @@
     <table>
       <thead>
         <tr>
-          <th style="width:28%">Artist</th>
-          <th style="width:40%">Title</th>
+          <th style="width:26%">Artist</th>
+          <th style="width:36%">Title</th>
           <th style="width:8%">BPM</th>
-          <th style="width:16%">genre</th>
+          <th style="width:14%">genre</th>
           <th style="width:8%">Year</th>
+          <th style="width:8%">Request</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -65,16 +67,19 @@
   </div>
 
   <script>
-    // ===== CSV SOURCE =====
-    // Best option (same origin on GitHub Pages):
+    // ===== CSV SOURCE (same-origin on GitHub Pages) =====
     const CSV_URL = 'djviciouz_serato_library_v2.csv';
-    // If you prefer raw.githubusercontent, use this exact URL instead:
+    // Or use raw.githubusercontent if you prefer:
     // const CSV_URL = 'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciouz_serato_library_v2.csv';
 
     // ===== EXPECTED HEADERS =====
-    // artist,title,bpm,genre,year  (case-sensitive on our side)
+    // artist,title,bpm,genre,year
 
-    const PAGE = 25;
+    // Performance knobs
+    const PAGE = 10;          // quick first paint
+    const MAX_RENDER = 200;   // cap DOM rows for smoothness
+    const MORE_STEP = 100;    // rows appended per "Show more"
+
     const allRows = [];
     let viewRows = [];
     let shown = 0;
@@ -82,25 +87,37 @@
     const $ = s => document.querySelector(s);
     const tbody = $('#tbody');
 
+    // ===== Request settings (replace with your number) =====
+    const REQUEST_SMS_NUMBER = '15551234567'; // digits only
+    const REQUEST_SMS = `sms:+${REQUEST_SMS_NUMBER}`;
+
     function esc(s){return String(s ?? '').replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
     function clean(v){return (v ?? '').toString().trim()}
 
+    function requestSong(row){
+      const body = encodeURIComponent(`Song request: ${row.artist} - ${row.title}`);
+      const url = `${REQUEST_SMS}&body=${body}`;
+      window.open(url, '_blank');
+    }
+
     function render(slice, append=false){
       const frag = document.createDocumentFragment();
-      slice.forEach(r => {
+      const limited = slice.slice(0, MAX_RENDER - (append ? tbody.rows.length : 0));
+      for (const r of limited){
         const tr = document.createElement('tr');
         tr.innerHTML =
           `<td>${esc(r.artist)}</td>
            <td>${esc(r.title)}</td>
            <td class="muted">${esc(r.bpm)}</td>
            <td class="muted">${esc(r.genre)}</td>
-           <td class="muted">${esc(r.year)}</td>`;
+           <td class="muted">${esc(r.year)}</td>
+           <td><button class="btn btn-sm" onclick='requestSong(${JSON.stringify(r)})'>Request</button></td>`;
         frag.appendChild(tr);
-      });
+      }
       if(!append) tbody.innerHTML = '';
       tbody.appendChild(frag);
       $('#count').textContent = `${tbody.rows.length} / ${(viewRows.length || allRows.length)} shown`;
-      $('#btnMore').disabled = shown >= viewRows.length;
+      $('#btnMore').disabled = shown >= viewRows.length || tbody.rows.length >= MAX_RENDER;
     }
 
     function showFirst(){
@@ -112,7 +129,7 @@
     }
 
     function showRandom(){
-      const n = Math.min(PAGE, allRows.length);
+      const n = Math.min(25, allRows.length);
       const idxs = Array.from({length: allRows.length}, (_, i) => i);
       for(let i=idxs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idxs[i],idxs[j]]=[idxs[j],idxs[i]];}
       viewRows = idxs.slice(0,n).map(i => allRows[i]);
@@ -122,7 +139,7 @@
 
     function showMore(){
       if(!viewRows.length) return;
-      const slice = viewRows.slice(shown, shown+PAGE);
+      const slice = viewRows.slice(shown, shown+MORE_STEP);
       shown += slice.length;
       if(slice.length) render(slice, true);
     }
@@ -144,36 +161,40 @@
       showFirst();
     }
 
-    // ===== Load CSV =====
+    // ===== Load & parse CSV off the main thread =====
     Papa.parse(CSV_URL, {
       download: true,
       header: true,
       skipEmptyLines: true,
-      step: (res) => {
-        const r = res.data;
-        // normalize expected columns
-        const row = {
-          artist: clean(r.artist),
-          title:  clean(r.title),
-          bpm:    clean(r.bpm),
-          genre:  clean(r.genre),
-          year:   clean(r.year)
-        };
-        if(!(row.artist || row.title)) return;
-        allRows.push(row);
-        if(allRows.length === PAGE){ enableUI(allRows.length); }
+      worker: true,          // parse in a Web Worker
+      chunkSize: 1024 * 64,  // ~64KB chunks
+      chunk: (results) => {
+        for (const r of results.data) {
+          const row = {
+            artist: clean(r.artist),
+            title:  clean(r.title),
+            bpm:    clean(r.bpm),
+            genre:  clean(r.genre),
+            year:   clean(r.year)
+          };
+          if (row.artist || row.title) allRows.push(row);
+        }
+        // First paint as soon as we have enough
+        if (allRows.length >= PAGE && $('#search').disabled) {
+          enableUI(allRows.length);
+        }
       },
       complete: () => {
-        if(!allRows.length){
-          $('#status').textContent = 'No rows found. Check headers: artist,title,bpm,genre,year';
+        if (!allRows.length) {
           $('#loader').style.display = 'none';
+          $('#status').textContent = 'No rows found. Check headers: artist,title,bpm,genre,year';
           return;
         }
-        if($('#search').disabled) enableUI(allRows.length);
+        if ($('#search').disabled) enableUI(allRows.length);
       },
       error: (err) => {
         $('#loader').style.display = 'none';
-        $('#status').textContent = 'Failed to load CSV (check path/permissions).';
+        $('#status').textContent = 'Failed to load CSV (check path/filename).';
         console.error(err);
       }
     });
