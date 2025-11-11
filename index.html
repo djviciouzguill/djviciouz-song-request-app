@@ -6,32 +6,59 @@
   <title>DJ Viciouz — Song Request</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    :root{--bg1:#000;--bg2:#111;--fg:#fff;--muted:#b3b3b3;--line:#222;--panel:#0a0a0a;--btn:#1e1e1e;--btnb:#333;--accent:#00d0ff}
+    :root{--bg1:#000;--bg2:#0a0a0a;--fg:#fff;--muted:#b3b3b3;--line:#222;--panel:#0d0d0d;--btn:#121212;--btnb:#2f2f2f;--accent:#00d0ff;--good:#42d392}
     *{box-sizing:border-box}
     body{margin:0;background:radial-gradient(circle at center,var(--bg2),var(--bg1));color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
     .container{max-width:1100px;margin:0 auto;padding:22px}
     header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
     header img{height:56px;width:auto;border-radius:8px}
     h1{font-size:22px;margin:0}
-    .status{font-size:13px;opacity:.85;margin-top:4px}
-    .bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .status{font-size:13px;opacity:.9;margin-top:4px}
+    .bar{display:grid;grid-template-columns:1fr auto auto auto auto;gap:10px;align-items:center;margin-top:14px}
     .pill{padding:8px 10px;border-radius:999px;background:#101010;border:1px solid #2a2a2a}
-    .search{flex:1;min-width:220px}
+    .search input,.select select,.btn{height:40px}
     .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
-    .select{min-width:180px}
     .select select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
     .btn{background:var(--btn);border:1px solid var(--btnb);color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer}
     .btn:hover{border-color:#555}
+    .btn-sm{padding:6px 10px;border-radius:8px;height:auto}
+    .btn-ghost{background:transparent;border-color:#2a2a2a}
     .loading{display:inline-flex;gap:8px;align-items:center;border:1px solid #2a2a2a;background:var(--panel);padding:10px 12px;border-radius:10px;margin-top:10px}
     .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 1s infinite alternate}
     @keyframes pulse{from{transform:scale(.8);opacity:.6}to{transform:scale(1.2);opacity:1}}
+
+    .filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .chip{border:1px solid #2a2a2a;background:#0b0b0b;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer;font-size:12px}
+    .chip.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(0,208,255,.2) inset}
+
     table{width:100%;border-collapse:collapse;margin-top:12px}
     th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
     th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid #333;z-index:1}
     td.muted{color:var(--muted)}
     tbody tr:hover{background:#0d0d0d}
-    .btn-sm{padding:6px 10px;border-radius:8px}
-    .hint{font-size:12px;opacity:.7;margin-top:6px}
+    .hint{font-size:12px;opacity:.75;margin-top:6px}
+
+    .sticky-tools{position:sticky;bottom:12px;display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal[open]{display:flex}
+    .card{background:#0f0f0f;border:1px solid #2a2a2a;border-radius:12px;max-width:560px;width:100%;padding:18px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .grow{flex:1}
+    .qr{width:160px;height:160px;border-radius:12px;border:1px dashed #333;background:#0a0a0a;display:grid;place-items:center;overflow:hidden}
+    .kbd{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; padding:2px 6px;border:1px solid #2a2a2a;border-radius:6px;background:#101010;font-size:12px}
+
+    @media (max-width:860px){
+      .bar{grid-template-columns:1fr 1fr 1fr auto auto}
+      header img{height:48px}
+      h1{font-size:18px}
+      th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5){display:none} /* hide BPM, Year on small screens */
+    }
+    @media (max-width:620px){
+      .bar{grid-template-columns:1fr auto auto}
+      .select.sort, .select.genre{grid-column:1/-1}
+    }
   </style>
 </head>
 <body>
@@ -42,68 +69,96 @@
         <h1>DJ Viciouz — Song Request Library</h1>
         <div class="status" id="status">Loading Song List…</div>
         <div class="hint" id="netHint" style="display:none">Network is slow—first batch will appear as it arrives.</div>
+        <div class="hint">Shortcuts: <span class="kbd">/</span> focus search · <span class="kbd">r</span> random 25 · <span class="kbd">g</span> clear genre</div>
       </div>
+      <div class="grow"></div>
+      <button class="btn btn-ghost" id="btnOpenQR" title="Show request/tip QR">QR</button>
     </header>
 
     <div class="bar">
-      <div class="search">
-        <input id="search" type="text" placeholder="Search artist, title, or genre…" disabled>
-      </div>
-      <div class="select">
-        <select id="genreSelect" disabled>
-          <option value="">All genres</option>
-        </select>
-      </div>
-      <button class="btn" id="btnFirst">Show first 10</button>
+      <div class="search"><input id="search" type="text" placeholder="Search artist, title, or genre…" disabled></div>
+      <div class="select genre"><select id="genreSelect" disabled><option value="">All genres</option></select></div>
+      <div class="select sort"><select id="sortSelect"><option value="artist">Artist A–Z</option><option value="title">Title A–Z</option><option value="bpm">BPM ↑</option><option value="year">Year ↑</option></select></div>
+      <button class="btn" id="btnFirst">First 10</button>
       <button class="btn" id="btnRandom">Random 25</button>
-      <button class="btn" id="btnMore">Show more</button>
+      <button class="btn" id="btnMore">More</button>
       <span class="pill" id="count">0 / 0 shown</span>
     </div>
 
+    <div class="filters" id="decadeFilters"></div>
+
     <div class="loading" id="loader"><span class="dot"></span> <span>Loading Song List…</span></div>
 
-    <table>
+    <table role="grid" aria-label="Song library">
       <thead>
         <tr>
           <th style="width:26%">Artist</th>
           <th style="width:36%">Title</th>
           <th style="width:8%">BPM</th>
-          <th style="width:14%">genre</th>
+          <th style="width:14%">Genre</th>
           <th style="width:8%">Year</th>
           <th style="width:8%">Request</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
     </table>
+
+    <div class="sticky-tools">
+      <button class="btn btn-ghost" id="btnClear">Clear filters</button>
+      <button class="btn" id="btnTop">Back to top</button>
+    </div>
   </div>
 
+  <!-- Request / Tip Modal -->
+  <dialog class="modal" id="qrModal">
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h2 id="qrTitle" style="margin:0;font-size:18px">Request a Song / Tip</h2>
+        <button class="btn btn-sm" id="btnCloseQR">Close</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Scan a code or tap a button—no app install required.</p>
+      <div class="row" style="margin-top:10px">
+        <div class="grow">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <a id="smsLink" class="btn" href="#" target="_blank">Open SMS to request</a>
+            <button id="copyNum" class="btn btn-ghost" title="Copy phone number">Copy number</button>
+            <a id="tipLink" class="btn btn-ghost" href="#" target="_blank">Tip Jar</a>
+          </div>
+          <div class="hint" style="margin-top:8px">Number: <span id="displayNum"></span></div>
+        </div>
+        <div class="qr"><img id="smsQR" alt="SMS QR" width="160" height="160" loading="lazy"></div>
+        <div class="qr"><img id="tipQR" alt="Tip QR" width="160" height="160" loading="lazy"></div>
+      </div>
+    </div>
+  </dialog>
+
   <script>
-    // ====== CONFIG (edit just your phone number) ======
+    // ====== CONFIG (edit your phone + tip link) ======
     const REQUEST_SMS_NUMBER = '15551234567'; // digits only
+    const TIP_URL = 'https://venmo.com/u/YourHandle'; // or CashApp/PayPal.me link
+
     const REQUEST_SMS = `sms:+${REQUEST_SMS_NUMBER}`;
+    const SMS_BODY = (row) => `Song request: ${row.artist} - ${row.title}`;
 
     // Performance knobs
     const PAGE = 10;          // quick first paint
-    const MAX_RENDER = 200;   // cap DOM rows
-    const MORE_STEP = 100;
+    const MAX_RENDER = 400;   // cap DOM rows (raised)
+    const MORE_STEP = 150;    // infinite scroll chunk
 
     // Persisted UI state
     const LS_GENRE = 'djv_genre';
     const LS_QUERY = 'djv_query';
+    const LS_SORT  = 'djv_sort';
+    const LS_DECADE= 'djv_decade';
 
     // ====== Robust CSV URL resolver ======
-    // We try several absolute URLs (worker-safe) until one returns 200.
     const ORIGIN = 'https://djviciouzguill.github.io';
     const BASE   = '/djviciouz-song-request-app/';
-
     const CANDIDATE_URLS = [
-      // common spellings — repo root
       ORIGIN + BASE + 'djviciouz_serato_library_v2.csv',
       ORIGIN + BASE + 'djviciou_serato_library_v2.csv',
-      // common spellings — /data folder
       ORIGIN + BASE + 'data/djviciouz_serato_library_v2.csv',
       ORIGIN + BASE + 'data/djviciou_serato_library_v2.csv',
-      // raw github fallbacks
       'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciouz_serato_library_v2.csv',
       'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciou_serato_library_v2.csv'
     ];
@@ -112,15 +167,8 @@
       for (const url of CANDIDATE_URLS) {
         try {
           const res = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
-          if (res.ok) {
-            console.log('[CSV] using', url);
-            return url;
-          } else {
-            console.warn('[CSV] not ok:', url, res.status);
-          }
-        } catch (e) {
-          console.warn('[CSV] failed:', url, e?.message);
-        }
+          if (res.ok) return url + (url.includes('raw.githubusercontent') ? '' : `?t=${Date.now()}`);
+        } catch (e) {}
       }
       throw new Error('No working CSV URL found. Check filename/location in the repo.');
     }
@@ -134,12 +182,48 @@
     const tbody = $('#tbody');
     const genreSelect = $('#genreSelect');
     const searchInput = $('#search');
+    const sortSelect = $('#sortSelect');
 
-    const esc   = s => String(s ?? '').replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    const esc   = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
     const clean = v => (v ?? '').toString().trim();
 
+    const decades = ['1970s','1980s','1990s','2000s','2010s','2020s'];
+    const decadeFilters = $('#decadeFilters');
+
+    function buildDecadeChips(){
+      const saved = localStorage.getItem(LS_DECADE) || '';
+      const chipAll = document.createElement('button');
+      chipAll.className = 'chip' + (!saved ? ' active' : '');
+      chipAll.textContent = 'All years';
+      chipAll.dataset.decade = '';
+      decadeFilters.appendChild(chipAll);
+      for(const d of decades){
+        const b = document.createElement('button');
+        b.className = 'chip' + (saved===d ? ' active' : '');
+        b.textContent = d;
+        b.dataset.decade = d;
+        decadeFilters.appendChild(b);
+      }
+      decadeFilters.addEventListener('click', (e)=>{
+        const b = e.target.closest('.chip');
+        if(!b) return;
+        for(const c of decadeFilters.querySelectorAll('.chip')) c.classList.remove('active');
+        b.classList.add('active');
+        localStorage.setItem(LS_DECADE, b.dataset.decade || '');
+        applyFilters();
+      });
+    }
+
+    function matchesDecade(year, dec){
+      if(!dec) return true;
+      const y = parseInt(year,10);
+      if (isNaN(y)) return false;
+      const start = parseInt(dec.slice(0,4),10);
+      return y>=start && y<start+10;
+    }
+
     function requestSong(row){
-      const body = encodeURIComponent(`Song request: ${row.artist} - ${row.title}`);
+      const body = encodeURIComponent(SMS_BODY(row));
       window.open(`${REQUEST_SMS}&body=${body}`, '_blank');
     }
 
@@ -147,7 +231,6 @@
       const frag = document.createDocumentFragment();
       const limit = Math.max(0, MAX_RENDER - (append ? tbody.rows.length : 0));
       const capped = slice.slice(0, limit);
-
       for (const r of capped){
         const tr = document.createElement('tr');
         tr.innerHTML =
@@ -156,26 +239,37 @@
            <td class="muted">${esc(r.bpm)}</td>
            <td class="muted">${esc(r.genre)}</td>
            <td class="muted">${esc(r.year)}</td>
-           <td><button class="btn btn-sm" onclick='requestSong(${JSON.stringify(r)})'>Request</button></td>`;
+           <td><button class="btn btn-sm" aria-label="Request ${esc(r.artist)} ${esc(r.title)}" onclick='requestSong(${JSON.stringify(r)})'>Request</button></td>`;
         frag.appendChild(tr);
       }
       if(!append) tbody.innerHTML = '';
       tbody.appendChild(frag);
-      $('#count').textContent = `${tbody.rows.length} / ${filteredRows.length || allRows.length} shown`;
+      $('#count').textContent = `${tbody.rows.length} / ${(filteredRows.length || allRows.length)} shown`;
       $('#btnMore').disabled = shown >= filteredRows.length || tbody.rows.length >= MAX_RENDER;
     }
 
     function currentQuery(){ return (searchInput.value || '').toLowerCase(); }
     function currentGenre(){ return genreSelect.value || ''; }
+    function currentDecade(){ return localStorage.getItem(LS_DECADE) || ''; }
+
+    function sortRows(rows){
+      const key = sortSelect.value || 'artist';
+      return rows.slice().sort((a,b)=>{
+        const av = (a[key]||'').toString().toLowerCase();
+        const bv = (b[key]||'').toString().toLowerCase();
+        if(key==='bpm' || key==='year') return (parseInt(av)||0) - (parseInt(bv)||0);
+        return av.localeCompare(bv);
+      });
+    }
 
     function applyFilters(){
       const q = currentQuery();
       const g = currentGenre();
-      filteredRows = allRows.filter(r => {
-        const matchesText  = !q || (r.artist + ' ' + r.title + ' ' + r.genre).toLowerCase().includes(q);
-        const matchesGenre = !g || (r.genre.toLowerCase() === g.toLowerCase());
-        return matchesText && matchesGenre;
-      });
+      const d = currentDecade();
+      const qMatch = (r) => !q || (r.artist + ' ' + r.title + ' ' + r.genre).toLowerCase().includes(q);
+      const gMatch = (r) => !g || (r.genre.toLowerCase() === g.toLowerCase());
+      const dMatch = (r) => matchesDecade(r.year, d);
+      filteredRows = sortRows(allRows).filter(r => qMatch(r) && gMatch(r) && dMatch(r));
       shown = 0;
       const slice = filteredRows.slice(0, PAGE);
       shown += slice.length;
@@ -183,126 +277,71 @@
       try {
         localStorage.setItem(LS_QUERY, searchInput.value || '');
         localStorage.setItem(LS_GENRE, genreSelect.value || '');
+        localStorage.setItem(LS_SORT, sortSelect.value || 'artist');
       } catch {}
     }
 
-    function showFirst(){
-      shown = 0;
-      const slice = filteredRows.slice(0, PAGE);
-      shown += slice.length;
-      render(slice, false);
-    }
+    function showFirst(){ shown = 0; const s = filteredRows.slice(0, PAGE); shown += s.length; render(s,false); }
 
     function showRandom(){
       const n = Math.min(25, filteredRows.length);
       const idxs = Array.from({length: filteredRows.length}, (_, i) => i);
       for(let i=idxs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [idxs[i],idxs[j]]=[idxs[j],idxs[i]]; }
       const rows = idxs.slice(0, n).map(i => filteredRows[i]);
-      shown = n;
-      render(rows, false);
+      shown = n; render(rows, false);
     }
 
-    function showMore(){
-      const slice = filteredRows.slice(shown, shown+MORE_STEP);
-      shown += slice.length;
-      if(slice.length) render(slice, true);
-    }
+    function showMore(){ const slice = filteredRows.slice(shown, shown+MORE_STEP); shown += slice.length; if(slice.length) render(slice, true); }
 
     function populateGenres(){
       const set = new Set();
-      for (const r of allRows){
-        const g = r.genre && r.genre.trim();
-        if (g) set.add(g);
-      }
+      for (const r of allRows){ const g = r.genre && r.genre.trim(); if (g) set.add(g); }
       const genres = Array.from(set).sort((a,b)=>a.localeCompare(b));
-      for (const g of genres){
-        const opt = document.createElement('option');
-        opt.value = g;
-        opt.textContent = g;
-        genreSelect.appendChild(opt);
-      }
+      for (const g of genres){ const opt = document.createElement('option'); opt.value = g; opt.textContent = g; genreSelect.appendChild(opt); }
       genreSelect.disabled = false;
-
-      // restore last chosen genre if present
-      try {
-        const savedGenre = localStorage.getItem(LS_GENRE) || '';
-        if (savedGenre && genres.includes(savedGenre)) {
-          genreSelect.value = savedGenre;
-        }
-      } catch {}
+      try { const savedGenre = localStorage.getItem(LS_GENRE) || ''; if (savedGenre && genres.includes(savedGenre)) genreSelect.value = savedGenre; } catch {}
     }
 
-    function restoreQuery(){
-      try {
-        const saved = localStorage.getItem(LS_QUERY) || '';
-        if (saved) searchInput.value = saved;
-      } catch {}
+    function restoreUI(){
+      try { const saved = localStorage.getItem(LS_QUERY) || ''; if (saved) searchInput.value = saved; } catch {}
+      try { const s = localStorage.getItem(LS_SORT) || 'artist'; sortSelect.value = s; } catch {}
     }
 
     function enableUI(total){
       $('#loader').style.display = 'none';
-      $('#status').textContent = `${total} tracks loaded`;
+      $('#status').innerHTML = `${total} tracks loaded <span style="color:var(--good)">• ready</span>`;
       $('#netHint').style.display = 'none';
       populateGenres();
-      restoreQuery();
+      restoreUI();
+      buildDecadeChips();
       filteredRows = allRows.slice();
       searchInput.disabled = false;
       applyFilters();
     }
 
     // Warn if network is slow to first chunk
-    setTimeout(() => {
-      if (document.getElementById('loader').style.display !== 'none') {
-        $('#netHint').style.display = 'block';
-      }
-    }, 2500);
+    setTimeout(() => { if (document.getElementById('loader').style.display !== 'none') $('#netHint').style.display = 'block'; }, 2500);
 
-    // ====== Boot: resolve URL, then parse with worker ======
+    // ===== Boot: resolve URL, then parse with worker =====
     (async function boot(){
       let CSV_URL = null;
-      try {
-        CSV_URL = await resolveCsvUrl();
-      } catch (e) {
-        $('#loader').style.display = 'none';
-        $('#status').textContent = 'Could not locate the library CSV. Check filename/location in the repo.';
-        console.error(e);
-        return;
-      }
+      try { CSV_URL = await resolveCsvUrl(); }
+      catch (e) { $('#loader').style.display = 'none'; $('#status').textContent = 'Could not locate the library CSV. Check filename/location in the repo.'; console.error(e); return; }
 
       Papa.parse(CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        worker: true,          // parse in a Web Worker (prevents UI freeze)
-        chunkSize: 1024 * 64,  // ~64KB chunks
+        download: true, header: true, skipEmptyLines: true, worker: true, chunkSize: 1024*64,
         chunk: (results) => {
           for (const r of results.data) {
-            const row = {
-              artist: clean(r.artist),
-              title:  clean(r.title),
-              bpm:    clean(r.bpm),
-              genre:  clean(r.genre),
-              year:   clean(r.year)
-            };
+            const row = { artist: clean(r.artist), title: clean(r.title), bpm: clean(r.bpm), genre: clean(r.genre), year: clean(r.year) };
             if (row.artist || row.title) allRows.push(row);
           }
-          if (allRows.length >= PAGE && document.getElementById('search').disabled) {
-            enableUI(allRows.length);
-          }
+          if (allRows.length >= PAGE && document.getElementById('search').disabled) enableUI(allRows.length);
         },
         complete: () => {
-          if (!allRows.length) {
-            $('#loader').style.display = 'none';
-            $('#status').textContent = 'No rows found. Check headers: artist,title,bpm,genre,year';
-            return;
-          }
+          if (!allRows.length) { $('#loader').style.display = 'none'; $('#status').textContent = 'No rows found. Headers must be: artist,title,bpm,genre,year'; return; }
           if (document.getElementById('search').disabled) enableUI(allRows.length);
         },
-        error: (err) => {
-          $('#loader').style.display = 'none';
-          $('#status').textContent = 'Failed to load CSV.';
-          console.error(err);
-        }
+        error: (err) => { $('#loader').style.display = 'none'; $('#status').textContent = 'Failed to load CSV.'; console.error(err); }
       });
     })();
 
@@ -310,14 +349,59 @@
     $('#btnFirst').addEventListener('click', showFirst);
     $('#btnRandom').addEventListener('click', showRandom);
     $('#btnMore').addEventListener('click', showMore);
+    $('#btnTop').addEventListener('click', () => window.scrollTo({top:0,behavior:'smooth'}));
+    $('#btnClear').addEventListener('click', () => { searchInput.value=''; genreSelect.value=''; localStorage.setItem(LS_DECADE,''); for(const c of decadeFilters.querySelectorAll('.chip')) c.classList.remove('active'); decadeFilters.querySelector('.chip').classList.add('active'); applyFilters(); });
 
-    let t=null;
-    $('#search').addEventListener('input', ()=>{
-      clearTimeout(t);
-      t = setTimeout(()=> applyFilters(), 120);
+    let t=null; $('#search').addEventListener('input', ()=>{ clearTimeout(t); t = setTimeout(()=> applyFilters(), 150); });
+    $('#genreSelect').addEventListener('change', applyFilters);
+    $('#sortSelect').addEventListener('change', ()=>{ localStorage.setItem(LS_SORT, sortSelect.value); applyFilters(); });
+
+    // Infinite scroll
+    window.addEventListener('scroll', () => {
+      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
+      if (nearBottom && !$('#btnMore').disabled) showMore();
     });
 
-    $('#genreSelect').addEventListener('change', applyFilters);
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if (e.key === '/' && document.activeElement !== searchInput){ e.preventDefault(); searchInput.focus(); }
+      if (e.key.toLowerCase() === 'r') showRandom();
+      if (e.key.toLowerCase() === 'g'){ genreSelect.value=''; applyFilters(); }
+    });
+
+    // ===== QR Modal =====
+    const modal = document.getElementById('qrModal');
+    const btnOpenQR = document.getElementById('btnOpenQR');
+    const btnCloseQR = document.getElementById('btnCloseQR');
+    const smsLink = document.getElementById('smsLink');
+    const tipLink = document.getElementById('tipLink');
+    const smsQR = document.getElementById('smsQR');
+    const tipQR = document.getElementById('tipQR');
+    const copyBtn = document.getElementById('copyNum');
+    const displayNum = document.getElementById('displayNum');
+
+    function buildQR(url){
+      const enc = encodeURIComponent(url);
+      return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${enc}`;
+    }
+
+    function openQR(){
+      const smsHref = `${REQUEST_SMS}`; // body is appended per-row on click; this link is generic SMS
+      smsLink.href = smsHref;
+      tipLink.href = TIP_URL;
+      smsQR.src = buildQR(smsHref);
+      tipQR.src = buildQR(TIP_URL);
+      displayNum.textContent = `+${REQUEST_SMS_NUMBER}`;
+      modal.setAttribute('open','');
+    }
+
+    btnOpenQR.addEventListener('click', openQR);
+    btnCloseQR.addEventListener('click', ()=> modal.removeAttribute('open'));
+    modal.addEventListener('click', (e)=> { if(e.target === modal) modal.removeAttribute('open'); });
+
+    copyBtn.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(`+${REQUEST_SMS_NUMBER}`); copyBtn.textContent='Copied!'; setTimeout(()=> copyBtn.textContent='Copy number', 1200); }catch(e){ alert('Copy failed'); }
+    });
   </script>
 </body>
 </html>
