@@ -6,7 +6,7 @@
   <title>DJ Viciouz — Song Request</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    :root{--bg1:#000;--bg2:#0a0a0a;--fg:#fff;--muted:#b3b3b3;--line:#222;--panel:#0d0d0d;--btn:#121212;--btnb:#2f2f2f;--accent:#00d0ff}
+    :root{--bg1:#000;--bg2:#0a0a0a;--fg:#fff;--muted:#b3b3b3;--line:#222;--panel:#0d0d0d;--btn:#121212;--btnb:#2f2f2f;--accent:#00d0ff;--good:#42d392}
     *{box-sizing:border-box}
     body{margin:0;background:radial-gradient(circle at center,var(--bg2),var(--bg1));color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
     .container{max-width:1100px;margin:0 auto;padding:22px}
@@ -14,7 +14,7 @@
     header img{height:56px;width:auto;border-radius:8px}
     h1{font-size:22px;margin:0}
     .status{font-size:13px;opacity:.9;margin-top:4px}
-    .bar{display:grid;grid-template-columns:1fr auto auto auto auto;gap:10px;align-items:center;margin-top:14px}
+    .bar{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;align-items:center;margin-top:14px}
     .pill{padding:8px 10px;border-radius:999px;background:#101010;border:1px solid #2a2a2a}
     .search input,.select select,.btn{height:40px}
     .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
@@ -22,35 +22,39 @@
     .btn{background:var(--btn);border:1px solid var(--btnb);color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer}
     .btn:hover{border-color:#555}
     .btn-sm{padding:6px 10px;border-radius:8px;height:auto}
+    .btn-icon{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--btn);border:1px solid var(--btnb);cursor:pointer}
     .loading{display:inline-flex;gap:8px;align-items:center;border:1px solid #2a2a2a;background:var(--panel);padding:10px 12px;border-radius:10px;margin-top:10px}
     .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 1s infinite alternate}
     @keyframes pulse{from{transform:scale(.8);opacity:.6}to{transform:scale(1.2);opacity:1}}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
-    th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid #333;z-index:1}
-    td.muted{color:var(--muted)}
-    tbody tr:hover{background:#0d0d0d}
-    .hint{font-size:12px;opacity:.75;margin-top:6px}
 
-    /* Decade chips */
     .filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
     .chip{border:1px solid #2a2a2a;background:#0b0b0b;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer;font-size:12px}
     .chip.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(0,208,255,.2) inset}
 
-    /* Modal */
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
+    th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid #333;z-index:1;user-select:none;cursor:pointer}
+    th.sortable{color:#fff}
+    th .ind{opacity:.7;margin-left:6px;font-size:12px}
+    td.muted{color:var(--muted)}
+    tbody tr:hover{background:#0d0d0d}
+    .hint{font-size:12px;opacity:.75;margin-top:6px}
+
+    .sticky-tools{position:sticky;bottom:12px;display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px}
     .modal[open]{display:flex}
-    .card{background:#0f0f0f;border:1px solid #2a2a2a;border-radius:12px;max-width:520px;width:100%;padding:18px}
+    .card{background:#0f0f0f;border:1px solid #2a2a2a;border-radius:12px;max-width:560px;width:100%;padding:18px}
     .row{display:flex;gap:12px;flex-wrap:wrap}
     .grow{flex:1}
     .qr{width:160px;height:160px;border-radius:12px;border:1px dashed #333;background:#0a0a0a;display:grid;place-items:center;overflow:hidden}
     .kbd{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; padding:2px 6px;border:1px solid #2a2a2a;border-radius:6px;background:#101010;font-size:12px}
 
     @media (max-width:860px){
-      .bar{grid-template-columns:1fr 1fr 1fr auto auto}
+      .bar{grid-template-columns:1fr 1fr 1fr auto auto auto}
       header img{height:48px}
       h1{font-size:18px}
-      th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5){display:none} /* hide BPM, Year on small screens */
+      th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5){display:none}
     }
     @media (max-width:620px){
       .bar{grid-template-columns:1fr auto auto}
@@ -71,22 +75,10 @@
     </header>
 
     <div class="bar">
-      <div class="search">
-        <input id="search" type="text" placeholder="Search artist, title, or genre…" disabled>
-      </div>
-      <div class="select genre">
-        <select id="genreSelect" disabled>
-          <option value="">All genres</option>
-        </select>
-      </div>
-      <div class="select sort">
-        <select id="sortSelect">
-          <option value="artist">Artist A–Z</option>
-          <option value="title">Title A–Z</option>
-          <option value="bpm">BPM ↑</option>
-          <option value="year">Year ↑</option>
-        </select>
-      </div>
+      <div class="search"><input id="search" type="text" placeholder="Search artist, title, or genre…" disabled></div>
+      <div class="select genre"><select id="genreSelect" disabled><option value="">All genres</option></select></div>
+      <div class="select sort"><select id="sortSelect"><option value="artist">Artist</option><option value="title">Title</option><option value="bpm">BPM</option><option value="year">Year</option></select></div>
+      <button class="btn-icon" id="sortDirBtn" title="Toggle sort direction">A–Z</button>
       <button class="btn" id="btnFirst">First 10</button>
       <button class="btn" id="btnRandom">Random 25</button>
       <button class="btn" id="btnMore">More</button>
@@ -100,31 +92,366 @@
     <table role="grid" aria-label="Song library">
       <thead>
         <tr>
-          <th style="width:26%">Artist</th>
-          <th style="width:36%">Title</th>
-          <th style="width:8%">BPM</th>
-          <th style="width:14%">Genre</th>
-          <th style="width:8%">Year</th>
-          <th style="width:8%">Request</th>
+          <th class="sortable" data-key="artist">Artist <span class="ind" id="ind-artist"></span></th>
+          <th class="sortable" data-key="title">Title <span class="ind" id="ind-title"></span></th>
+          <th class="sortable" data-key="bpm">BPM <span class="ind" id="ind-bpm"></span></th>
+          <th class="sortable" data-key="genre">Genre <span class="ind" id="ind-genre"></span></th>
+          <th class="sortable" data-key="year">Year <span class="ind" id="ind-year"></span></th>
+          <th>Request</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
     </table>
+
+    <div class="sticky-tools">
+      <button class="btn" id="btnClear">Clear filters</button>
+      <button class="btn" id="btnTop">Back to top</button>
+    </div>
   </div>
 
-  <!-- Request / Tip Modal (desktop-safe request) -->
   <dialog class="modal" id="qrModal">
     <div class="card" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <h2 id="qrTitle" style="margin:0;font-size:18px">Request this song</h2>
+        <h2 id="qrTitle" style="margin:0;font-size:18px">Request a Song</h2>
         <button class="btn btn-sm" id="btnCloseQR">Close</button>
       </div>
-      <p class="hint" style="margin-top:8px">Scan the QR with your phone camera or copy the number below and text the request.</p>
+      <p class="hint" style="margin-top:8px">Scan with your phone or copy the number—works great on desktop.</p>
       <div class="row" style="margin-top:10px">
         <div class="grow">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <a id="smsLink" class="btn" href="#" target="_blank" rel="noopener">Open SMS (mobile)</a>
-            <button id="copyNum" class="btn" title="Copy phone number">Copy number</button>
+            <a id="smsLink" class="btn" href="#" target="_blank">Open SMS (mobile)</a>
+            <button id="copyNum" class="btn btn-ghost" title="Copy phone number">Copy number</button>
+          </div>
+          <div class="hint" style="margin-top:8px">Number: <span id="displayNum"></span></div>
+          <div class="hint" id="songHint" style="margin-top:8px"></div>
+        </div>
+        <div class="qr"><img id="smsQR" alt="SMS QR" width="160" height="160" loading="lazy"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ANY SONG REQUEST Modal -->
+  <dialog class="modal" id="anyModal">
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="anyTitle">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h2 id="anyTitle" style="margin:0;font-size:18px">Request ANY Song</h2>
+        <button class="btn btn-sm" id="btnCloseAny">Close</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Type a song or paste a link. Guests on desktop can scan the QR to text you.</p>
+
+      <!-- Simple manual form -->
+      <div class="row" style="margin-top:10px">
+        <div class="grow">
+          <div style="display:grid;gap:8px">
+            <input id="anyArtist" placeholder="Artist" class="search" style="height:40px;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff"/>
+            <input id="anyTitle" placeholder="Title" class="search" style="height:40px;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff"/>
+            <input id="anyLink" placeholder="Optional link (Spotify/YouTube/Apple)" class="search" style="height:40px;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff"/>
+            <textarea id="anyNotes" placeholder="Notes (dedication, version, clean/explicit, etc.)" rows="3" style="padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff;resize:vertical"></textarea>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="anySend" class="btn">Text this request</button>
+              <button id="anyCopy" class="btn btn-ghost">Copy text</button>
+            </div>
+            <div class="hint" id="anyPreview" style="margin-top:4px"></div>
+          </div>
+        </div>
+        <div class="qr"><img id="anyQR" alt="ANY request QR" width="160" height="160" loading="lazy"></div>
+      </div>
+
+      <!-- Zero-backend autocomplete (Apple iTunes Search API) -->
+      <div style="margin-top:16px">
+        <div class="hint" style="margin-bottom:6px">Or search suggestions (no login):</div>
+        <div class="row" style="gap:8px;align-items:center">
+          <input id="suggQuery" placeholder="Search tracks… (powered by iTunes)" class="search" style="height:40px;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff;flex:1"/>
+          <button id="suggBtn" class="btn">Search</button>
+        </div>
+        <div id="suggList" style="margin-top:8px;display:grid;gap:8px"></div>
+      </div>
+
+      <details style="margin-top:16px">
+        <summary class="hint">Spotify integration (optional)</summary>
+        <div class="hint" style="margin-top:6px">You can enable client‑side Spotify search later using OAuth PKCE (no backend). Add a “Login with Spotify” button and call the <code>/v1/search</code> endpoint after auth. I’ll wire this after you register a Spotify app and share the Client ID + redirect URL.</div>
+      </details>
+    </div>
+  </dialog>
+
+  <script>
+    // ===== CONFIG =====
+    const REQUEST_SMS_NUMBER = '15551234567';
+    const REQUEST_SMS = `sms:+${REQUEST_SMS_NUMBER}`;
+    const SMS_BODY = (row) => `Song request: ${row.artist} - ${row.title}`;
+
+    const PAGE = 10; const MAX_RENDER = 400; const MORE_STEP = 150;
+
+    const LS_GENRE='djv_genre', LS_QUERY='djv_query', LS_SORT='djv_sort', LS_DIR='djv_sort_dir', LS_DECADE='djv_decade';
+
+    // CSV resolver
+    const ORIGIN='https://djviciouzguill.github.io', BASE='/djviciouz-song-request-app/';
+    const CANDIDATE_URLS=[
+      ORIGIN+BASE+'djviciouz_serato_library_v2.csv',
+      ORIGIN+BASE+'djviciou_serato_library_v2.csv',
+      ORIGIN+BASE+'data/djviciouz_serato_library_v2.csv',
+      ORIGIN+BASE+'data/djviciou_serato_library_v2.csv',
+      'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciouz_serato_library_v2.csv',
+      'https://raw.githubusercontent.com/djviciouzguill/djviciou_serato_library_v2.csv'
+    ];
+    async function resolveCsvUrl(){for(const url of CANDIDATE_URLS){try{const r=await fetch(url,{method:'HEAD',cache:'no-cache'});if(r.ok)return url+(url.includes('raw.githubusercontent')?'':`?t=${Date.now()}`);}catch{}}throw new Error('No working CSV URL found.');}
+
+    // State
+    const allRows=[]; let filteredRows=[]; let shown=0;
+    const $=s=>document.querySelector(s);
+    const tbody=$('#tbody'), genreSelect=$('#genreSelect'), searchInput=$('#search'), sortSelect=$('#sortSelect'), sortDirBtn=$('#sortDirBtn');
+    const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    const clean=v=>(v??'').toString().trim();
+
+    // Decade chips
+    const decades=['1970s','1980s','1990s','2000s','2010s','2020s'];
+    const decadeFilters=$('#decadeFilters');
+    function buildDecadeChips(){
+      const saved=localStorage.getItem(LS_DECADE)||'';
+      const chipAll=document.createElement('button'); chipAll.className='chip'+(!saved?' active':''); chipAll.textContent='All years'; chipAll.dataset.decade=''; decadeFilters.appendChild(chipAll);
+      for(const d of decades){const b=document.createElement('button'); b.className='chip'+(saved===d?' active':''); b.textContent=d; b.dataset.decade=d; decadeFilters.appendChild(b);}    
+      decadeFilters.addEventListener('click',e=>{const b=e.target.closest('.chip'); if(!b) return; for(const c of decadeFilters.querySelectorAll('.chip')) c.classList.remove('active'); b.classList.add('active'); localStorage.setItem(LS_DECADE,b.dataset.decade||''); applyFilters();});
+    }
+    function matchesDecade(year,dec){ if(!dec) return true; const y=parseInt(year,10); if(isNaN(y)) return false; const start=parseInt(dec.slice(0,4),10); return y>=start && y<start+10; }
+
+    // Modal (desktop request)
+    const modal=$('#qrModal'), btnCloseQR=$('#btnCloseQR'), smsLink=$('#smsLink'), smsQR=$('#smsQR'), copyBtn=$('#copyNum'), displayNum=$('#displayNum'), songHint=$('#songHint');
+    const isMobile=()=>/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const buildQR=url=>`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
+    async function requestSong(row){
+      const body=encodeURIComponent(SMS_BODY(row)); const smsHref=`${REQUEST_SMS}&body=${body}`;
+      if(isMobile()){ window.open(smsHref,'_blank'); return; }
+      smsLink.href=smsHref; smsQR.src=buildQR(smsHref); displayNum.textContent=`+${REQUEST_SMS_NUMBER}`; songHint.textContent=`Prefill: "${SMS_BODY(row)}"`; modal.setAttribute('open','');
+    }
+    btnCloseQR.addEventListener('click',()=>modal.removeAttribute('open'));
+    modal.addEventListener('click',e=>{if(e.target===modal) modal.removeAttribute('open');});
+    copyBtn.addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText(`+${REQUEST_SMS_NUMBER}`); copyBtn.textContent='Copied!'; setTimeout(()=>copyBtn.textContent='Copy number',1200);}catch{ alert('Copy failed'); }});
+
+    // Sorting
+    function currentSortKey(){ return sortSelect.value||'artist'; }
+    function currentSortDir(){ return localStorage.getItem(LS_DIR)||'asc'; }
+    function setSortDir(dir){ localStorage.setItem(LS_DIR, dir); renderSortIndicators(); sortDirBtn.textContent = indicatorLabel(); }
+    function indicatorLabel(){ const k=currentSortKey(), d=currentSortDir(); const isNum=(k==='bpm'||k==='year'); return isNum ? (d==='asc'?'↑':'↓') : (d==='asc'?'A–Z':'Z–A'); }
+    function renderSortIndicators(){
+      const keys=['artist','title','bpm','genre','year'];
+      const k=currentSortKey(), d=currentSortDir();
+      for(const key of keys){ const el=document.getElementById(`ind-${key}`); if(!el) continue; el.textContent = key===k ? (d==='asc'?'▲':'▼') : ''; }
+    }
+    function sortRows(rows){
+      const key=currentSortKey(); const dir=currentSortDir()==='desc'?-1:1;
+      return rows.slice().sort((a,b)=>{
+        const av=(a[key]||'').toString().toLowerCase(); const bv=(b[key]||'').toString().toLowerCase();
+        if(key==='bpm'||key==='year'){ const an=parseInt(av)||0, bn=parseInt(bv)||0; return (an-bn)*dir; }
+        return av.localeCompare(bv)*dir;
+      });
+    }
+
+    // Render & filters
+    function render(slice,append=false){
+      const frag=document.createDocumentFragment();
+      const limit=Math.max(0, MAX_RENDER - (append ? tbody.rows.length : 0));
+      const capped=slice.slice(0,limit);
+      for(const r of capped){
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${esc(r.artist)}</td>
+           <td>${esc(r.title)}</td>
+           <td class="muted">${esc(r.bpm)}</td>
+           <td class="muted">${esc(r.genre)}</td>
+           <td class="muted">${esc(r.year)}</td>
+           <td><button class="btn btn-sm" aria-label="Request ${esc(r.artist)} ${esc(r.title)}">Request</button></td>`;
+        tr.querySelector('button').addEventListener('click',()=>requestSong(r));
+        frag.appendChild(tr);
+      }
+      if(!append) tbody.innerHTML='';
+      tbody.appendChild(frag);
+      document.getElementById('count').textContent=`${tbody.rows.length} / ${(filteredRows.length||allRows.length)} shown`;
+      document.getElementById('btnMore').disabled= shown>=filteredRows.length || tbody.rows.length>=MAX_RENDER;
+    }
+
+    function currentQuery(){ return (searchInput.value||'').toLowerCase(); }
+    function currentGenre(){ return genreSelect.value||''; }
+    function currentDecade(){ return localStorage.getItem(LS_DECADE)||''; }
+
+    function applyFilters(){
+      const q=currentQuery(), g=currentGenre(), d=currentDecade();
+      const qMatch=r=>!q||(r.artist+' '+r.title+' '+r.genre).toLowerCase().includes(q);
+      const gMatch=r=>!g||(r.genre.toLowerCase()===g.toLowerCase());
+      const dMatch=r=>matchesDecade(r.year,d);
+      filteredRows=sortRows(allRows).filter(r=>qMatch(r)&&gMatch(r)&&dMatch(r));
+      shown=0; const sl=filteredRows.slice(0,PAGE); shown+=sl.length; render(sl,false);
+      try{ localStorage.setItem(LS_QUERY, searchInput.value||''); localStorage.setItem(LS_GENRE, genreSelect.value||''); localStorage.setItem(LS_SORT, sortSelect.value||'artist'); }catch{}
+      renderSortIndicators();
+    }
+
+    function showFirst(){ shown=0; const s=filteredRows.slice(0,PAGE); shown+=s.length; render(s,false); }
+    function showRandom(){ const n=Math.min(25,filteredRows.length); const idxs=Array.from({length:filteredRows.length},(_,i)=>i); for(let i=idxs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [idxs[i],idxs[j]]=[idxs[j],idxs[i]];} const rows=idxs.slice(0,n).map(i=>filteredRows[i]); shown=n; render(rows,false); }
+    function showMore(){ const s=filteredRows.slice(shown,shown+MORE_STEP); shown+=s.length; if(s.length) render(s,true); }
+
+    function populateGenres(){ const set=new Set(); for(const r of allRows){ const g=r.genre&&r.genre.trim(); if(g) set.add(g);} const genres=Array.from(set).sort((a,b)=>a.localeCompare(b)); for(const g of genres){ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; genreSelect.appendChild(opt);} genreSelect.disabled=false; try{ const saved=localStorage.getItem(LS_GENRE)||''; if(saved&&genres.includes(saved)) genreSelect.value=saved; }catch{} }
+
+    function restoreUI(){ try{ const saved=localStorage.getItem(LS_QUERY)||''; if(saved) searchInput.value=saved; }catch{} try{ const s=localStorage.getItem(LS_SORT)||'artist'; sortSelect.value=s; }catch{} sortDirBtn.textContent=indicatorLabel(); renderSortIndicators(); }
+
+    function enableUI(total){ document.getElementById('loader').style.display='none'; document.getElementById('status').innerHTML=`${total} tracks loaded <span style="color:var(--good)">• ready</span>`; document.getElementById('netHint').style.display='none'; populateGenres(); restoreUI(); buildDecadeChips(); filteredRows=allRows.slice(); searchInput.disabled=false; if(!localStorage.getItem(LS_DIR)) setSortDir('asc'); applyFilters(); }
+
+    setTimeout(()=>{ if(document.getElementById('loader').style.display!=='none') document.getElementById('netHint').style.display='block'; },2500);
+
+    (async function boot(){ let CSV_URL=null; try{ CSV_URL=await resolveCsvUrl(); }catch(e){ document.getElementById('loader').style.display='none'; document.getElementById('status').textContent='Could not locate the library CSV. Check filename/location in the repo.'; console.error(e); return; }
+      Papa.parse(CSV_URL,{ download:true, header:true, skipEmptyLines:true, worker:true, chunkSize:1024*64,
+        chunk:(results)=>{ for(const r of results.data){ const row={ artist:clean(r.artist), title:clean(r.title), bpm:clean(r.bpm), genre:clean(r.genre), year:clean(r.year)}; if(row.artist||row.title) allRows.push(row);} if(allRows.length>=PAGE && document.getElementById('search').disabled) enableUI(allRows.length); },
+        complete:()=>{ if(!allRows.length){ document.getElementById('loader').style.display='none'; document.getElementById('status').textContent='No rows found. Headers must be: artist,title,bpm,genre,year'; return;} if(document.getElementById('search').disabled) enableUI(allRows.length); },
+        error:(err)=>{ document.getElementById('loader').style.display='none'; document.getElementById('status').textContent='Failed to load CSV.'; console.error(err);} }); })();
+
+    // Events
+    document.getElementById('btnFirst').addEventListener('click',showFirst);
+    document.getElementById('btnRandom').addEventListener('click',showRandom);
+    document.getElementById('btnMore').addEventListener('click',showMore);
+    document.getElementById('btnTop').addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+    document.getElementById('btnClear').addEventListener('click',()=>{ searchInput.value=''; genreSelect.value=''; localStorage.setItem(LS_DECADE,''); for(const c of decadeFilters.querySelectorAll('.chip')) c.classList.remove('active'); decadeFilters.querySelector('.chip').classList.add('active'); applyFilters(); });
+
+    let t=null; searchInput.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>applyFilters(),150); });
+    genreSelect.addEventListener('change',applyFilters);
+    sortSelect.addEventListener('change',()=>{ localStorage.setItem(LS_SORT, sortSelect.value); renderSortIndicators(); applyFilters(); sortDirBtn.textContent=indicatorLabel(); });
+    sortDirBtn.addEventListener('click',()=>{ const dir=currentSortDir()==='asc'?'desc':'asc'; setSortDir(dir); applyFilters(); });
+
+    // Clickable header sorting
+    document.querySelectorAll('th.sortable').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const key=th.dataset.key; const prev=sortSelect.value; if(prev===key){ setSortDir(currentSortDir()==='asc'?'desc':'asc'); } else { sortSelect.value=key; localStorage.setItem(LS_SORT,key); setSortDir('asc'); }
+        applyFilters(); sortDirBtn.textContent=indicatorLabel();
+      });
+    });
+
+    // Infinite scroll
+    window.addEventListener('scroll',()=>{ const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300; if(nearBottom && !document.getElementById('btnMore').disabled) showMore(); });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown',e=>{ if(e.key==='/' && document.activeElement!==searchInput){ e.preventDefault(); searchInput.focus(); } if(e.key.toLowerCase()==='r') showRandom(); if(e.key.toLowerCase()==='g'){ genreSelect.value=''; localStorage.setItem(LS_DECADE,''); applyFilters(); } });
+  </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DJ Viciouz — Song Request</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root{--bg1:#000;--bg2:#0a0a0a;--fg:#fff;--muted:#b3b3b3;--line:#222;--panel:#0d0d0d;--btn:#121212;--btnb:#2f2f2f;--accent:#00d0ff;--good:#42d392}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at center,var(--bg2),var(--bg1));color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .container{max-width:1100px;margin:0 auto;padding:22px}
+    header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    header img{height:56px;width:auto;border-radius:8px}
+    h1{font-size:22px;margin:0}
+    .status{font-size:13px;opacity:.9;margin-top:4px}
+    .bar{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;align-items:center;margin-top:14px}
+    .pill{padding:8px 10px;border-radius:999px;background:#101010;border:1px solid #2a2a2a}
+    .search input,.select select,.btn{height:40px}
+    .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
+    .select select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#0c0c0c;color:#fff}
+    .btn{background:var(--btn);border:1px solid var(--btnb);color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .btn:hover{border-color:#555}
+    .btn-sm{padding:6px 10px;border-radius:8px;height:auto}
+    .btn-icon{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--btn);border:1px solid var(--btnb);cursor:pointer}
+    .loading{display:inline-flex;gap:8px;align-items:center;border:1px solid #2a2a2a;background:var(--panel);padding:10px 12px;border-radius:10px;margin-top:10px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 1s infinite alternate}
+    @keyframes pulse{from{transform:scale(.8);opacity:.6}to{transform:scale(1.2);opacity:1}}
+
+    .filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .chip{border:1px solid #2a2a2a;background:#0b0b0b;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer;font-size:12px}
+    .chip.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(0,208,255,.2) inset}
+
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
+    th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid #333;z-index:1;user-select:none;cursor:pointer}
+    th.sortable{color:#fff}
+    th .ind{opacity:.7;margin-left:6px;font-size:12px}
+    td.muted{color:var(--muted)}
+    tbody tr:hover{background:#0d0d0d}
+    .hint{font-size:12px;opacity:.75;margin-top:6px}
+
+    .sticky-tools{position:sticky;bottom:12px;display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal[open]{display:flex}
+    .card{background:#0f0f0f;border:1px solid #2a2a2a;border-radius:12px;max-width:560px;width:100%;padding:18px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .grow{flex:1}
+    .qr{width:160px;height:160px;border-radius:12px;border:1px dashed #333;background:#0a0a0a;display:grid;place-items:center;overflow:hidden}
+    .kbd{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; padding:2px 6px;border:1px solid #2a2a2a;border-radius:6px;background:#101010;font-size:12px}
+
+    @media (max-width:860px){
+      .bar{grid-template-columns:1fr 1fr 1fr auto auto auto}
+      header img{height:48px}
+      h1{font-size:18px}
+      th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5){display:none}
+    }
+    @media (max-width:620px){
+      .bar{grid-template-columns:1fr auto auto}
+      .select.sort, .select.genre{grid-column:1/-1}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="djviciouzbranding.png" alt="DJ Viciouz" />
+      <div>
+        <h1>DJ Viciouz — Song Request Library</h1>
+        <div class="status" id="status">Loading Song List…</div>
+        <div class="hint" id="netHint" style="display:none">Network is slow—first batch will appear as it arrives.</div>
+        <div class="hint">Shortcuts: <span class="kbd">/</span> focus search · <span class="kbd">r</span> random 25 · <span class="kbd">g</span> clear genre</div>
+      </div>
+    </header>
+
+    <div class="bar">
+      <div class="search"><input id="search" type="text" placeholder="Search artist, title, or genre…" disabled></div>
+      <div class="select genre"><select id="genreSelect" disabled><option value="">All genres</option></select></div>
+      <div class="select sort"><select id="sortSelect"><option value="artist">Artist</option><option value="title">Title</option><option value="bpm">BPM</option><option value="year">Year</option></select></div>
+      <button class="btn-icon" id="sortDirBtn" title="Toggle sort direction">A–Z</button>
+      <button class="btn" id="btnFirst">First 10</button>
+      <button class="btn" id="btnRandom">Random 25</button>
+      <button class="btn" id="btnMore">More</button>
+      <span class="pill" id="count">0 / 0 shown</span>
+    </div>
+
+    <div class="filters" id="decadeFilters"></div>
+
+    <div class="loading" id="loader"><span class="dot"></span> <span>Loading Song List…</span></div>
+
+    <table role="grid" aria-label="Song library">
+      <thead>
+        <tr>
+          <th class="sortable" data-key="artist">Artist <span class="ind" id="ind-artist"></span></th>
+          <th class="sortable" data-key="title">Title <span class="ind" id="ind-title"></span></th>
+          <th class="sortable" data-key="bpm">BPM <span class="ind" id="ind-bpm"></span></th>
+          <th class="sortable" data-key="genre">Genre <span class="ind" id="ind-genre"></span></th>
+          <th class="sortable" data-key="year">Year <span class="ind" id="ind-year"></span></th>
+          <th>Request</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <div class="sticky-tools">
+      <button class="btn" id="btnClear">Clear filters</button>
+      <button class="btn" id="btnTop">Back to top</button>
+    </div>
+  </div>
+
+  <dialog class="modal" id="qrModal">
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h2 id="qrTitle" style="margin:0;font-size:18px">Request a Song</h2>
+        <button class="btn btn-sm" id="btnCloseQR">Close</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Scan with your phone or copy the number—works great on desktop.</p>
+      <div class="row" style="margin-top:10px">
+        <div class="grow">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <a id="smsLink" class="btn" href="#" target="_blank">Open SMS (mobile)</a>
+            <button id="copyNum" class="btn btn-ghost" title="Copy phone number">Copy number</button>
           </div>
           <div class="hint" style="margin-top:8px">Number: <span id="displayNum"></span></div>
           <div class="hint" id="songHint" style="margin-top:8px"></div>
@@ -135,307 +462,157 @@
   </dialog>
 
   <script>
-    // ====== CONFIG (edit these) ======
-    const REQUEST_SMS_NUMBER = '15551234567'; // digits only
-    const TIP_URL = ''; // optional: 'https://venmo.com/u/YourHandle'
-    const REQUEST_SMS_BASE = `sms:+${REQUEST_SMS_NUMBER}`;
-
+    // ===== CONFIG =====
+    const REQUEST_SMS_NUMBER = '15551234567';
+    const REQUEST_SMS = `sms:+${REQUEST_SMS_NUMBER}`;
     const SMS_BODY = (row) => `Song request: ${row.artist} - ${row.title}`;
 
-    // Performance knobs
-    const PAGE = 10;
-    const MAX_RENDER = 400;
-    const MORE_STEP = 150;
+    const PAGE = 10; const MAX_RENDER = 400; const MORE_STEP = 150;
 
-    // Persisted UI state
-    const LS_GENRE = 'djv_genre';
-    const LS_QUERY = 'djv_query';
-    const LS_SORT  = 'djv_sort';
-    const LS_DECADE= 'djv_decade';
+    const LS_GENRE='djv_genre', LS_QUERY='djv_query', LS_SORT='djv_sort', LS_DIR='djv_sort_dir', LS_DECADE='djv_decade';
 
-    // CSV URL resolver
-    const ORIGIN = 'https://djviciouzguill.github.io';
-    const BASE   = '/djviciouz-song-request-app/';
-    const CANDIDATE_URLS = [
-      ORIGIN + BASE + 'djviciouz_serato_library_v2.csv',
-      ORIGIN + BASE + 'djviciou_serato_library_v2.csv',
-      ORIGIN + BASE + 'data/djviciouz_serato_library_v2.csv',
-      ORIGIN + BASE + 'data/djviciou_serato_library_v2.csv',
+    // CSV resolver
+    const ORIGIN='https://djviciouzguill.github.io', BASE='/djviciouz-song-request-app/';
+    const CANDIDATE_URLS=[
+      ORIGIN+BASE+'djviciouz_serato_library_v2.csv',
+      ORIGIN+BASE+'djviciou_serato_library_v2.csv',
+      ORIGIN+BASE+'data/djviciouz_serato_library_v2.csv',
+      ORIGIN+BASE+'data/djviciou_serato_library_v2.csv',
       'https://raw.githubusercontent.com/djviciouzguill/djviciouz-song-request-app/main/djviciouz_serato_library_v2.csv',
       'https://raw.githubusercontent.com/djviciouzguill/djviciou_serato_library_v2.csv'
     ];
+    async function resolveCsvUrl(){for(const url of CANDIDATE_URLS){try{const r=await fetch(url,{method:'HEAD',cache:'no-cache'});if(r.ok)return url+(url.includes('raw.githubusercontent')?'':`?t=${Date.now()}`);}catch{}}throw new Error('No working CSV URL found.');}
 
-    async function resolveCsvUrl() {
-      for (const url of CANDIDATE_URLS) {
-        try {
-          const res = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
-          if (res.ok) return url + (url.includes('raw.githubusercontent') ? '' : `?t=${Date.now()}`);
-        } catch {}
-      }
-      throw new Error('No working CSV URL found. Check filename/location in the repo.');
-    }
+    // State
+    const allRows=[]; let filteredRows=[]; let shown=0;
+    const $=s=>document.querySelector(s);
+    const tbody=$('#tbody'), genreSelect=$('#genreSelect'), searchInput=$('#search'), sortSelect=$('#sortSelect'), sortDirBtn=$('#sortDirBtn');
+    const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    const clean=v=>(v??'').toString().trim();
 
-    // ====== App state ======
-    const allRows = [];
-    let filteredRows = [];
-    let shown = 0;
-
-    const $ = s => document.querySelector(s);
-    const tbody = $('#tbody');
-    const genreSelect = $('#genreSelect');
-    const searchInput = $('#search');
-    const sortSelect = $('#sortSelect');
-
-    const esc   = s => String(s ?? '').replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-    const clean = v => (v ?? '').toString().trim();
-
-    // Decades
-    const decades = ['1970s','1980s','1990s','2000s','2010s','2020s'];
-    const decadeFilters = $('#decadeFilters');
-
+    // Decade chips
+    const decades=['1970s','1980s','1990s','2000s','2010s','2020s'];
+    const decadeFilters=$('#decadeFilters');
     function buildDecadeChips(){
-      const saved = localStorage.getItem(LS_DECADE) || '';
-      const chipAll = document.createElement('button');
-      chipAll.className = 'chip' + (!saved ? ' active' : '');
-      chipAll.textContent = 'All years';
-      chipAll.dataset.decade = '';
-      decadeFilters.appendChild(chipAll);
-      for(const d of decades){
-        const b = document.createElement('button');
-        b.className = 'chip' + (saved===d ? ' active' : '');
-        b.textContent = d;
-        b.dataset.decade = d;
-        decadeFilters.appendChild(b);
-      }
-      decadeFilters.addEventListener('click', (e)=>{
-        const b = e.target.closest('.chip');
-        if(!b) return;
-        for(const c of decadeFilters.querySelectorAll('.chip')) c.classList.remove('active');
-        b.classList.add('active');
-        localStorage.setItem(LS_DECADE, b.dataset.decade || '');
-        applyFilters();
+      const saved=localStorage.getItem(LS_DECADE)||'';
+      const chipAll=document.createElement('button'); chipAll.className='chip'+(!saved?' active':''); chipAll.textContent='All years'; chipAll.dataset.decade=''; decadeFilters.appendChild(chipAll);
+      for(const d of decades){const b=document.createElement('button'); b.className='chip'+(saved===d?' active':''); b.textContent=d; b.dataset.decade=d; decadeFilters.appendChild(b);}    
+      decadeFilters.addEventListener('click',e=>{const b=e.target.closest('.chip'); if(!b) return; for(const c of decadeFilters.querySelectorAll('.chip')) c.classList.remove('active'); b.classList.add('active'); localStorage.setItem(LS_DECADE,b.dataset.decade||''); applyFilters();});
+    }
+    function matchesDecade(year,dec){ if(!dec) return true; const y=parseInt(year,10); if(isNaN(y)) return false; const start=parseInt(dec.slice(0,4),10); return y>=start && y<start+10; }
+
+    // Modal (desktop request)
+    const modal=$('#qrModal'), btnCloseQR=$('#btnCloseQR'), smsLink=$('#smsLink'), smsQR=$('#smsQR'), copyBtn=$('#copyNum'), displayNum=$('#displayNum'), songHint=$('#songHint');
+    const isMobile=()=>/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const buildQR=url=>`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
+    async function requestSong(row){
+      const body=encodeURIComponent(SMS_BODY(row)); const smsHref=`${REQUEST_SMS}&body=${body}`;
+      if(isMobile()){ window.open(smsHref,'_blank'); return; }
+      smsLink.href=smsHref; smsQR.src=buildQR(smsHref); displayNum.textContent=`+${REQUEST_SMS_NUMBER}`; songHint.textContent=`Prefill: "${SMS_BODY(row)}"`; modal.setAttribute('open','');
+    }
+    btnCloseQR.addEventListener('click',()=>modal.removeAttribute('open'));
+    modal.addEventListener('click',e=>{if(e.target===modal) modal.removeAttribute('open');});
+    copyBtn.addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText(`+${REQUEST_SMS_NUMBER}`); copyBtn.textContent='Copied!'; setTimeout(()=>copyBtn.textContent='Copy number',1200);}catch{ alert('Copy failed'); }});
+
+    // Sorting
+    function currentSortKey(){ return sortSelect.value||'artist'; }
+    function currentSortDir(){ return localStorage.getItem(LS_DIR)||'asc'; }
+    function setSortDir(dir){ localStorage.setItem(LS_DIR, dir); renderSortIndicators(); sortDirBtn.textContent = indicatorLabel(); }
+    function indicatorLabel(){ const k=currentSortKey(), d=currentSortDir(); const isNum=(k==='bpm'||k==='year'); return isNum ? (d==='asc'?'↑':'↓') : (d==='asc'?'A–Z':'Z–A'); }
+    function renderSortIndicators(){
+      const keys=['artist','title','bpm','genre','year'];
+      const k=currentSortKey(), d=currentSortDir();
+      for(const key of keys){ const el=document.getElementById(`ind-${key}`); if(!el) continue; el.textContent = key===k ? (d==='asc'?'▲':'▼') : ''; }
+    }
+    function sortRows(rows){
+      const key=currentSortKey(); const dir=currentSortDir()==='desc'?-1:1;
+      return rows.slice().sort((a,b)=>{
+        const av=(a[key]||'').toString().toLowerCase(); const bv=(b[key]||'').toString().toLowerCase();
+        if(key==='bpm'||key==='year'){ const an=parseInt(av)||0, bn=parseInt(bv)||0; return (an-bn)*dir; }
+        return av.localeCompare(bv)*dir;
       });
     }
 
-    function matchesDecade(year, dec){
-      if(!dec) return true;
-      const y = parseInt(year,10);
-      if (isNaN(y)) return false;
-      const start = parseInt(dec.slice(0,4),10);
-      return y>=start && y<start+10;
-    }
-
-    // Desktop-or-mobile check
-    const isLikelyMobile = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    // Request handling (desktop-safe)
-    const modal = document.getElementById('qrModal');
-    const btnCloseQR = document.getElementById('btnCloseQR');
-    const smsLink = document.getElementById('smsLink');
-    const smsQR = document.getElementById('smsQR');
-    const copyBtn = document.getElementById('copyNum');
-    const displayNum = document.getElementById('displayNum');
-    const songHint = document.getElementById('songHint');
-
-    function buildQR(url){
-      const enc = encodeURIComponent(url);
-      return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${enc}`;
-    }
-
-    async function requestSong(row){
-      const body = encodeURIComponent(SMS_BODY(row));
-      const smsHref = `${REQUEST_SMS_BASE}&body=${body}`;
-
-      if (isLikelyMobile()) {
-        // phones: open sms: link
-        window.open(smsHref, '_blank');
-        return;
-      }
-      // desktop: show modal with QR + copy
-      smsLink.href = smsHref;
-      smsQR.src = buildQR(smsHref);
-      displayNum.textContent = `+${REQUEST_SMS_NUMBER}`;
-      songHint.textContent = `Prefill: "${SMS_BODY(row)}"`;
-      modal.setAttribute('open','');
-    }
-
-    btnCloseQR.addEventListener('click', ()=> modal.removeAttribute('open'));
-    modal.addEventListener('click', (e)=> { if(e.target === modal) modal.removeAttribute('open'); });
-    copyBtn.addEventListener('click', async ()=>{
-      try{
-        await navigator.clipboard.writeText(`+${REQUEST_SMS_NUMBER}`);
-        copyBtn.textContent='Copied!';
-        setTimeout(()=> copyBtn.textContent='Copy number', 1200);
-      }catch{ alert('Copy failed'); }
-    });
-
-    function render(slice, append=false){
-      const frag = document.createDocumentFragment();
-      const limit = Math.max(0, MAX_RENDER - (append ? tbody.rows.length : 0));
-      const capped = slice.slice(0, limit);
-      for (const r of capped){
-        const tr = document.createElement('tr');
-        tr.innerHTML =
-          `<td>${esc(r.artist)}</td>
+    // Render & filters
+    function render(slice,append=false){
+      const frag=document.createDocumentFragment();
+      const limit=Math.max(0, MAX_RENDER - (append ? tbody.rows.length : 0));
+      const capped=slice.slice(0,limit);
+      for(const r of capped){
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${esc(r.artist)}</td>
            <td>${esc(r.title)}</td>
            <td class="muted">${esc(r.bpm)}</td>
            <td class="muted">${esc(r.genre)}</td>
            <td class="muted">${esc(r.year)}</td>
            <td><button class="btn btn-sm" aria-label="Request ${esc(r.artist)} ${esc(r.title)}">Request</button></td>`;
-        tr.querySelector('button').addEventListener('click', ()=>requestSong(r));
+        tr.querySelector('button').addEventListener('click',()=>requestSong(r));
         frag.appendChild(tr);
       }
-      if(!append) tbody.innerHTML = '';
+      if(!append) tbody.innerHTML='';
       tbody.appendChild(frag);
-      $('#count').textContent = `${tbody.rows.length} / ${(filteredRows.length || allRows.length)} shown`;
-      $('#btnMore').disabled = shown >= filteredRows.length || tbody.rows.length >= MAX_RENDER;
+      document.getElementById('count').textContent=`${tbody.rows.length} / ${(filteredRows.length||allRows.length)} shown`;
+      document.getElementById('btnMore').disabled= shown>=filteredRows.length || tbody.rows.length>=MAX_RENDER;
     }
 
-    function currentQuery(){ return (searchInput.value || '').toLowerCase(); }
-    function currentGenre(){ return genreSelect.value || ''; }
-    function currentDecade(){ return localStorage.getItem(LS_DECADE) || ''; }
-
-    function sortRows(rows){
-      const key = sortSelect.value || 'artist';
-      return rows.slice().sort((a,b)=>{
-        const av = (a[key]||'').toString().toLowerCase();
-        const bv = (b[key]||'').toString().toLowerCase();
-        if(key==='bpm' || key==='year') return (parseInt(av)||0) - (parseInt(bv)||0);
-        return av.localeCompare(bv);
-      });
-    }
+    function currentQuery(){ return (searchInput.value||'').toLowerCase(); }
+    function currentGenre(){ return genreSelect.value||''; }
+    function currentDecade(){ return localStorage.getItem(LS_DECADE)||''; }
 
     function applyFilters(){
-      const q = currentQuery();
-      const g = currentGenre();
-      const d = currentDecade();
-      const qMatch = (r) => !q || (r.artist + ' ' + r.title + ' ' + r.genre).toLowerCase().includes(q);
-      const gMatch = (r) => !g || (r.genre.toLowerCase() === g.toLowerCase());
-      const dMatch = (r) => matchesDecade(r.year, d);
-      filteredRows = sortRows(allRows).filter(r => qMatch(r) && gMatch(r) && dMatch(r));
-      shown = 0;
-      const slice = filteredRows.slice(0, PAGE);
-      shown += slice.length;
-      render(slice, false);
-      try {
-        localStorage.setItem(LS_QUERY, searchInput.value || '');
-        localStorage.setItem(LS_GENRE, genreSelect.value || '');
-        localStorage.setItem(LS_SORT, sortSelect.value || 'artist');
-      } catch {}
+      const q=currentQuery(), g=currentGenre(), d=currentDecade();
+      const qMatch=r=>!q||(r.artist+' '+r.title+' '+r.genre).toLowerCase().includes(q);
+      const gMatch=r=>!g||(r.genre.toLowerCase()===g.toLowerCase());
+      const dMatch=r=>matchesDecade(r.year,d);
+      filteredRows=sortRows(allRows).filter(r=>qMatch(r)&&gMatch(r)&&dMatch(r));
+      shown=0; const sl=filteredRows.slice(0,PAGE); shown+=sl.length; render(sl,false);
+      try{ localStorage.setItem(LS_QUERY, searchInput.value||''); localStorage.setItem(LS_GENRE, genreSelect.value||''); localStorage.setItem(LS_SORT, sortSelect.value||'artist'); }catch{}
+      renderSortIndicators();
     }
 
-    function showFirst(){ shown = 0; const s = filteredRows.slice(0, PAGE); shown += s.length; render(s,false); }
-    function showRandom(){
-      const n = Math.min(25, filteredRows.length);
-      const idxs = Array.from({length: filteredRows.length}, (_, i) => i);
-      for(let i=idxs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [idxs[i],idxs[j]]=[idxs[j],idxs[i]]; }
-      const rows = idxs.slice(0, n).map(i => filteredRows[i]);
-      shown = n; render(rows, false);
-    }
-    function showMore(){ const slice = filteredRows.slice(shown, shown+MORE_STEP); shown += slice.length; if(slice.length) render(slice, true); }
+    function showFirst(){ shown=0; const s=filteredRows.slice(0,PAGE); shown+=s.length; render(s,false); }
+    function showRandom(){ const n=Math.min(25,filteredRows.length); const idxs=Array.from({length:filteredRows.length},(_,i)=>i); for(let i=idxs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [idxs[i],idxs[j]]=[idxs[j],idxs[i]];} const rows=idxs.slice(0,n).map(i=>filteredRows[i]); shown=n; render(rows,false); }
+    function showMore(){ const s=filteredRows.slice(shown,shown+MORE_STEP); shown+=s.length; if(s.length) render(s,true); }
 
-    function populateGenres(){
-      const set = new Set();
-      for (const r of allRows){ const g = r.genre && r.genre.trim(); if (g) set.add(g); }
-      const genres = Array.from(set).sort((a,b)=>a.localeCompare(b));
-      for (const g of genres){ const opt = document.createElement('option'); opt.value = g; opt.textContent = g; genreSelect.appendChild(opt); }
-      genreSelect.disabled = false;
-      try { const savedGenre = localStorage.getItem(LS_GENRE) || ''; if (savedGenre && genres.includes(savedGenre)) genreSelect.value = savedGenre; } catch {}
-    }
+    function populateGenres(){ const set=new Set(); for(const r of allRows){ const g=r.genre&&r.genre.trim(); if(g) set.add(g);} const genres=Array.from(set).sort((a,b)=>a.localeCompare(b)); for(const g of genres){ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; genreSelect.appendChild(opt);} genreSelect.disabled=false; try{ const saved=localStorage.getItem(LS_GENRE)||''; if(saved&&genres.includes(saved)) genreSelect.value=saved; }catch{} }
 
-    function restoreUI(){
-      try { const saved = localStorage.getItem(LS_QUERY) || ''; if (saved) searchInput.value = saved; } catch {}
-      try { const s = localStorage.getItem(LS_SORT) || 'artist'; sortSelect.value = s; } catch {}
-    }
+    function restoreUI(){ try{ const saved=localStorage.getItem(LS_QUERY)||''; if(saved) searchInput.value=saved; }catch{} try{ const s=localStorage.getItem(LS_SORT)||'artist'; sortSelect.value=s; }catch{} sortDirBtn.textContent=indicatorLabel(); renderSortIndicators(); }
 
-    function enableUI(total){
-      $('#loader').style.display = 'none';
-      $('#status').textContent = `${total} tracks loaded`;
-      $('#netHint').style.display = 'none';
-      populateGenres();
-      restoreUI();
-      buildDecadeChips();
-      filteredRows = allRows.slice();
-      searchInput.disabled = false;
-      applyFilters();
-    }
+    function enableUI(total){ document.getElementById('loader').style.display='none'; document.getElementById('status').innerHTML=`${total} tracks loaded <span style="color:var(--good)">• ready</span>`; document.getElementById('netHint').style.display='none'; populateGenres(); restoreUI(); buildDecadeChips(); filteredRows=allRows.slice(); searchInput.disabled=false; if(!localStorage.getItem(LS_DIR)) setSortDir('asc'); applyFilters(); }
 
-    // Warn on slow network
-    setTimeout(() => {
-      if (document.getElementById('loader').style.display !== 'none') {
-        $('#netHint').style.display = 'block';
-      }
-    }, 2500);
+    setTimeout(()=>{ if(document.getElementById('loader').style.display!=='none') document.getElementById('netHint').style.display='block'; },2500);
 
-    // Boot
-    (async function boot(){
-      let CSV_URL = null;
-      try { CSV_URL = await resolveCsvUrl(); }
-      catch (e) {
-        $('#loader').style.display = 'none';
-        $('#status').textContent = 'Could not locate the library CSV. Check filename/location in the repo.';
-        console.error(e); return;
-      }
-
-      Papa.parse(CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        worker: true,
-        chunkSize: 1024 * 64,
-        chunk: (results) => {
-          for (const r of results.data) {
-            const row = {
-              artist: clean(r.artist),
-              title:  clean(r.title),
-              bpm:    clean(r.bpm),
-              genre:  clean(r.genre),
-              year:   clean(r.year)
-            };
-            if (row.artist || row.title) allRows.push(row);
-          }
-          if (allRows.length >= PAGE && document.getElementById('search').disabled) {
-            enableUI(allRows.length);
-          }
-        },
-        complete: () => {
-          if (!allRows.length) {
-            $('#loader').style.display = 'none';
-            $('#status').textContent = 'No rows found. Headers must be: artist,title,bpm,genre,year';
-            return;
-          }
-          if (document.getElementById('search').disabled) enableUI(allRows.length);
-        },
-        error: (err) => {
-          $('#loader').style.display = 'none';
-          $('#status').textContent = 'Failed to load CSV.';
-          console.error(err);
-        }
-      });
-    })();
+    (async function boot(){ let CSV_URL=null; try{ CSV_URL=await resolveCsvUrl(); }catch(e){ document.getElementById('loader').style.display='none'; document.getElementById('status').textContent='Could not locate the library CSV. Check filename/location in the repo.'; console.error(e); return; }
+      Papa.parse(CSV_URL,{ download:true, header:true, skipEmptyLines:true, worker:true, chunkSize:1024*64,
+        chunk:(results)=>{ for(const r of results.data){ const row={ artist:clean(r.artist), title:clean(r.title), bpm:clean(r.bpm), genre:clean(r.genre), year:clean(r.year)}; if(row.artist||row.title) allRows.push(row);} if(allRows.length>=PAGE && document.getElementById('search').disabled) enableUI(allRows.length); },
+        complete:()=>{ if(!allRows.length){ document.getElementById('loader').style.display='none'; document.getElementById('status').textContent='No rows found. Headers must be: artist,title,bpm,genre,year'; return;} if(document.getElementById('search').disabled) enableUI(allRows.length); },
+        error:(err)=>{ document.getElementById('loader').style.display='none'; document.getElementById('status').textContent='Failed to load CSV.'; console.error(err);} }); })();
 
     // Events
-    $('#btnFirst').addEventListener('click', showFirst);
-    $('#btnRandom').addEventListener('click', showRandom);
-    $('#btnMore').addEventListener('click', showMore);
+    document.getElementById('btnFirst').addEventListener('click',showFirst);
+    document.getElementById('btnRandom').addEventListener('click',showRandom);
+    document.getElementById('btnMore').addEventListener('click',showMore);
+    document.getElementById('btnTop').addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+    document.getElementById('btnClear').addEventListener('click',()=>{ searchInput.value=''; genreSelect.value=''; localStorage.setItem(LS_DECADE,''); for(const c of decadeFilters.querySelectorAll('.chip')) c.classList.remove('active'); decadeFilters.querySelector('.chip').classList.add('active'); applyFilters(); });
 
-    let t=null;
-    $('#search').addEventListener('input', ()=>{ clearTimeout(t); t = setTimeout(()=> applyFilters(), 150); });
-    $('#genreSelect').addEventListener('change', applyFilters);
-    $('#sortSelect').addEventListener('change', ()=>{ localStorage.setItem(LS_SORT, sortSelect.value); applyFilters(); });
+    let t=null; searchInput.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>applyFilters(),150); });
+    genreSelect.addEventListener('change',applyFilters);
+    sortSelect.addEventListener('change',()=>{ localStorage.setItem(LS_SORT, sortSelect.value); renderSortIndicators(); applyFilters(); sortDirBtn.textContent=indicatorLabel(); });
+    sortDirBtn.addEventListener('click',()=>{ const dir=currentSortDir()==='asc'?'desc':'asc'; setSortDir(dir); applyFilters(); });
+
+    // Clickable header sorting
+    document.querySelectorAll('th.sortable').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const key=th.dataset.key; const prev=sortSelect.value; if(prev===key){ setSortDir(currentSortDir()==='asc'?'desc':'asc'); } else { sortSelect.value=key; localStorage.setItem(LS_SORT,key); setSortDir('asc'); }
+        applyFilters(); sortDirBtn.textContent=indicatorLabel();
+      });
+    });
 
     // Infinite scroll
-    window.addEventListener('scroll', () => {
-      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
-      if (nearBottom && !$('#btnMore').disabled) showMore();
-    });
+    window.addEventListener('scroll',()=>{ const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300; if(nearBottom && !document.getElementById('btnMore').disabled) showMore(); });
 
     // Keyboard shortcuts
-    window.addEventListener('keydown', (e)=>{
-      if (e.key === '/' && document.activeElement !== searchInput){ e.preventDefault(); searchInput.focus(); }
-      if (e.key.toLowerCase() === 'r') showRandom();
-      if (e.key.toLowerCase() === 'g'){ genreSelect.value=''; localStorage.setItem(LS_DECADE,''); applyFilters(); }
-    });
+    window.addEventListener('keydown',e=>{ if(e.key==='/' && document.activeElement!==searchInput){ e.preventDefault(); searchInput.focus(); } if(e.key.toLowerCase()==='r') showRandom(); if(e.key.toLowerCase()==='g'){ genreSelect.value=''; localStorage.setItem(LS_DECADE,''); applyFilters(); } });
   </script>
 </body>
 </html>
